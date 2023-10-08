@@ -1,57 +1,54 @@
 use std::borrow::Cow;
+
+use wgpu::{SurfaceCapabilities, TextureFormat};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+use winit::dpi::PhysicalSize;
+
+use crate::init_wgpu::InitWgpu;
+
+mod init_wgpu;
+
+pub struct SwapchainData {
+    capabilities: SurfaceCapabilities,
+    format: TextureFormat,
+}
 
 struct App {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
+    size: PhysicalSize<u32>,
     window: Window,
+    swapchain_config: SwapchainData,
 }
 
-impl App {}
+impl App {
+    pub async fn new(window: Window) -> App {
+        let (instance, surface) = InitWgpu::create_instance(&window);
+        let (adapter, device, queue) = InitWgpu::get_device_and_queue(&instance, &surface).await;
+        let swapchain_config = InitWgpu::get_swapchain_config(&surface, &adapter);
+        let config = InitWgpu::init_config(&swapchain_config, &window.inner_size());
+
+        App {
+            size: window.inner_size(),
+            surface,
+            device,
+            queue,
+            window,
+            swapchain_config,
+            config,
+        }
+    }
+}
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
-    let size = window.inner_size();
+    let mut app = App::new(window).await;
 
-    let instance = wgpu::Instance::default();
-
-    let surface = unsafe { instance.create_surface(&window) }.unwrap();
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            force_fallback_adapter: false,
-            compatible_surface: Some(&surface),
-        })
-        .await
-        .expect("Failed to find an appropriate adapter");
-
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                label: None,
-                features: wgpu::Features::empty(),
-                limits: wgpu::Limits::default(),
-            },
-            None,
-        )
-        .await
-        .expect("Failed to create device");
-
-    // Load the shaders from disk
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-    });
-
-
-    let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[0];
 
     // TEX TEST
     let diffuse_bytes = include_bytes!("teddy.jpg");
@@ -66,7 +63,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         height: dimensions.1,
         depth_or_array_layers: 1,
     };
-    let diffuse_texture = device.create_texture(
+    let diffuse_texture = app.device.create_texture(
         &wgpu::TextureDescriptor {
             size: texture_size,
             mip_level_count: 1,
@@ -78,7 +75,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             view_formats: &[],
         }
     );
-    queue.write_texture(
+    app.queue.write_texture(
         wgpu::ImageCopyTexture {
             texture: &diffuse_texture,
             mip_level: 0,
@@ -94,7 +91,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         texture_size,
     );
     let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+    let diffuse_sampler = app.device.create_sampler(&wgpu::SamplerDescriptor {
         address_mode_u: wgpu::AddressMode::ClampToEdge,
         address_mode_v: wgpu::AddressMode::ClampToEdge,
         address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -104,7 +101,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ..Default::default()
     });
     let texture_bind_group_layout =
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        app.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -127,7 +124,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             ],
             label: Some("texture_bind_group_layout"),
         });
-    let diffuse_bind_group = device.create_bind_group(
+    let diffuse_bind_group = app.device.create_bind_group(
         &wgpu::BindGroupDescriptor {
             layout: &texture_bind_group_layout,
             entries: &[
@@ -144,15 +141,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         }
     );
 
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+
+    let shader = app.device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
+        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+    });
+
+    let pipeline_layout = app.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
+        // bind_group_layouts: &[],
         bind_group_layouts: &[&texture_bind_group_layout],
         push_constant_ranges: &[],
     });
 
     //
 
-    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    let render_pipeline = app.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: None,
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
@@ -163,7 +167,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fs_main",
-            targets: &[Some(swapchain_format.into())],
+            targets: &[Some(app.swapchain_config.format.into())],
         }),
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: None,
@@ -171,18 +175,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         multiview: None,
     });
 
-    let mut config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: swapchain_format,
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode: swapchain_capabilities.alpha_modes[0],
-        view_formats: vec![],
-    };
 
-    surface.configure(&device, &config);
-
+    app.surface.configure(&app.device, &app.config);
 
     event_loop.run(move |event, _, control_flow| {
         // // Have the closure take ownership of the resources.
@@ -193,25 +187,25 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent {
-                event: WindowEvent::Resized(size),
+                event: WindowEvent::Resized(..),
                 ..
             } => {
                 // Reconfigure the surface with the new size
-                config.width = size.width;
-                config.height = size.height;
-                surface.configure(&device, &config);
+                app.config.width = app.size.width;
+                app.config.height = app.size.height;
+                app.surface.configure(&app.device, &app.config);
                 // On macos the window needs to be redrawn manually after resizing
-                window.request_redraw();
+                app.window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                let frame = surface
+                let frame = app.surface
                     .get_current_texture()
                     .expect("Failed to acquire next swap chain texture");
                 let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
                 let mut encoder =
-                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                    app.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
@@ -230,7 +224,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.draw(0..3, 0..1);
                 }
 
-                queue.submit(Some(encoder.finish()));
+                app.queue.submit(Some(encoder.finish()));
                 frame.present();
             }
             Event::WindowEvent {
