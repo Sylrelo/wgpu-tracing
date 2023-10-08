@@ -6,6 +6,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+use winit::dpi::{PhysicalSize, Size};
 
 use structs::{App, SwapchainData};
 
@@ -137,14 +138,31 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     ///////////////////////////////////////////////////////////
 
-    let (tracing_group_layout, tracing_group, tracing_pipeline) = init_tracing_pipeline(&app.device, &diffuse_texture_view);
+    let mut default_uniform = ComputeUniform::default();
+    default_uniform.test = [0.3, 0.6, 0.9, 1.0];
+
+    let tray_uni_buffer = ComputeContext::uniform_init(&app.device, default_uniform);
+    let (
+        tray_uni_layout,
+        tray_uni_group
+    ) = ComputeContext::uniform_create_binds(&app.device, &tray_uni_buffer);
+
+    let (
+        tracing_group_layout,
+        tracing_group,
+        tracing_pipeline
+    ) = init_tracing_pipeline(&app.device, tray_uni_layout, &diffuse_texture_view);
+
     let pipeline_tracing = ComputeContext {
         pipeline: tracing_pipeline,
         bind_group: tracing_group,
         bind_group_layout: tracing_group_layout,
-        uniform: ComputeUniform::default(),
-        uniform_buffer: ComputeContext::uniform_init(&app.device, ComputeUniform::default()),
+        uniform: default_uniform,
+        uniform_buffer: tray_uni_buffer,
+        uniform_bind_group: tray_uni_group,
     };
+
+    // pipeline_tracing.uniform_update(&app.queue);
 
     ///////////////////////////////////////////////////////////
 
@@ -155,8 +173,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let pipeline_layout = app.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        // bind_group_layouts: &[],
-        bind_group_layouts: &[&texture_bind_group_layout],
+        bind_group_layouts: &[
+            &texture_bind_group_layout,
+        ],
         push_constant_ranges: &[],
     });
 
@@ -229,6 +248,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                     compute_pass.set_pipeline(&pipelines.tracing.pipeline);
                     compute_pass.set_bind_group(0, &pipelines.tracing.bind_group, &[]);
+                    compute_pass.set_bind_group(1, &pipelines.tracing.uniform_bind_group, &[]);
                     compute_pass.dispatch_workgroups(1920, 1080, 1);
                 }
 
@@ -266,6 +286,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 fn main() {
     let event_loop = EventLoop::new();
     let window = winit::window::Window::new(&event_loop).unwrap();
+
+    window.set_inner_size(Size::from(PhysicalSize::new(1280, 720)));
+    
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();

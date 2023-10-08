@@ -23,7 +23,7 @@ pub fn init_tracing_pipeline_layout(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn init_tracing_pipeline(device: &Device, texture: &TextureView) -> (BindGroupLayout, BindGroup, ComputePipeline) {
+pub fn init_tracing_pipeline(device: &Device, uniform_group_layout: BindGroupLayout, texture: &TextureView) -> (BindGroupLayout, BindGroup, ComputePipeline) {
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Label::from("Tracing Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("compute.wgsl"))),
@@ -33,7 +33,10 @@ pub fn init_tracing_pipeline(device: &Device, texture: &TextureView) -> (BindGro
 
     let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Label::from("Tracing Layout"),
-        bind_group_layouts: &[&bind_group_layout],
+        bind_group_layouts: &[
+            &bind_group_layout,
+            &uniform_group_layout,
+        ],
         push_constant_ranges: &[],
     });
 
@@ -75,12 +78,12 @@ impl ComputeContext {
         );
     }
 
-    pub fn uniform_create_binds(&self, device: &Device) {
+    pub fn uniform_create_binds(device: &Device, buffer: &Buffer) -> (BindGroupLayout, BindGroup) {
         let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -93,16 +96,18 @@ impl ComputeContext {
         });
 
 
-        // let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        //     layout: &group_layout,
-        //     entries: &[
-        //         wgpu::BindGroupEntry {
-        //             binding: 0,
-        //             resource: camera_buffer.as_entire_binding(),
-        //         }
-        //     ],
-        //     label: Some("[Compute Uniform] Bind Group"),
-        // });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("[Compute Uniform] Bind Group"),
+        });
+
+        return (group_layout, bind_group);
     }
 }
 

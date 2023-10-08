@@ -15,6 +15,8 @@ pub struct ComputeContext {
 
     pub uniform: ComputeUniform,
     pub uniform_buffer: Buffer,
+    // pub uniform_group_layout: BindGroupLayout,
+    pub uniform_bind_group: BindGroup,
 }
 
 pub struct RenderContext {
@@ -43,6 +45,6 @@ pub struct App {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct ComputeUniform {
-    view_proj: [[f32; 4]; 4],
-    test: [f32; 4],
+    pub view_proj: [[f32; 4]; 4],
+    pub test: [f32; 4],
 }
