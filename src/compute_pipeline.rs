@@ -70,6 +70,7 @@ impl ComputeContext {
         )
     }
 
+    #[allow(dead_code)]
     pub fn uniform_update(&self, queue: &Queue) {
         queue.write_buffer(
             &self.uniform_buffer,

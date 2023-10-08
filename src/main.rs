@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use cgmath::{Rad, SquareMatrix};
 use wgpu::TextureFormat;
 use winit::{
     event::{Event, WindowEvent},
@@ -7,12 +8,14 @@ use winit::{
     window::Window,
 };
 use winit::dpi::{PhysicalSize, Size};
+use winit::window::WindowBuilder;
 
 use structs::{App, SwapchainData};
 
 use crate::compute_pipeline::init_tracing_pipeline;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
+use crate::wgpu_utils::OPENGL_TO_WGPU_MATRIX;
 
 mod init_wgpu;
 mod compute_pipeline;
@@ -141,6 +144,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut default_uniform = ComputeUniform::default();
     default_uniform.test = [0.3, 0.6, 0.9, 1.0];
 
+    let perspective_projection = cgmath::perspective(Rad(std::f32::consts::FRAC_PI_2), 1280.0 / 720.0, 0.01, 1000.0);
+
+
+    default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
+
+    println!("{:?}", default_uniform.view_proj);
+
     let tray_uni_buffer = ComputeContext::uniform_init(&app.device, default_uniform);
     let (
         tray_uni_layout,
@@ -214,6 +224,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // init_tracing_pipeline_layout(&app.device);
 
+    app.window.set_visible(true);
+
     event_loop.run(move |event, _, control_flow| {
         // let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
@@ -285,10 +297,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
 fn main() {
     let event_loop = EventLoop::new();
-    let window = winit::window::Window::new(&event_loop).unwrap();
+    let window = WindowBuilder::new()
+        .with_visible(false)
+        .with_inner_size(
+            Size::from(
+                PhysicalSize::new(1280, 720)
+            )
+        )
+        .build(&event_loop).unwrap();
 
-    window.set_inner_size(Size::from(PhysicalSize::new(1280, 720)));
-    
+
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();
