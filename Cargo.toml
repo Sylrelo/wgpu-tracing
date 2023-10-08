@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 winit = "0.28.7"
-wgpu = "0.17.1"
+wgpu = "0.17.0"
 env_logger = "0.10.0"
 pollster = "0.3.0"
 
@@ -13,3 +13,7 @@ pollster = "0.3.0"
 version = "0.24.7"
 default-features = false
 features = ["jpeg"]
+
+[dependencies.bytemuck]
+features = ['derive']
+version = "1.14.0"

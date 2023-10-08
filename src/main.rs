@@ -9,14 +9,15 @@ use winit::{
 
 use structs::{App, SwapchainData};
 
-use crate::init_compute_pipeline::init_tracing_pipeline;
+use crate::compute_pipeline::init_tracing_pipeline;
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{ComputeContext, Pipelines, RenderContext};
+use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
 
 mod init_wgpu;
-mod init_compute_pipeline;
+mod compute_pipeline;
 mod init_render_pipeline;
 mod structs;
+mod wgpu_utils;
 
 
 impl App {
@@ -134,6 +135,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         }
     );
 
+    ///////////////////////////////////////////////////////////
+
+    let (tracing_group_layout, tracing_group, tracing_pipeline) = init_tracing_pipeline(&app.device, &diffuse_texture_view);
+    let pipeline_tracing = ComputeContext {
+        pipeline: tracing_pipeline,
+        bind_group: tracing_group,
+        bind_group_layout: tracing_group_layout,
+        uniform: ComputeUniform::default(),
+        uniform_buffer: ComputeContext::uniform_init(&app.device, ComputeUniform::default()),
+    };
+
+    ///////////////////////////////////////////////////////////
 
     let shader = app.device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
@@ -146,8 +159,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         bind_group_layouts: &[&texture_bind_group_layout],
         push_constant_ranges: &[],
     });
-
-    //
 
     let render_pipeline = app.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: None,
@@ -171,20 +182,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     app.surface.configure(&app.device, &app.config);
 
-    let (tracing_group_layout, tracing_group, tracing_pipeline) = init_tracing_pipeline(&app.device, &diffuse_texture_view);
+    let pipeline_render = RenderContext {
+        pipeline: render_pipeline,
+        layout: pipeline_layout,
+    };
 
     let pipelines = Pipelines {
-        tracing: ComputeContext {
-            pipeline: tracing_pipeline,
-            bind_group: tracing_group,
-            bind_group_layout: tracing_group_layout,
-        },
-        render: RenderContext {
-            pipeline: render_pipeline,
-            layout: pipeline_layout,
-            // bind_groups: pipeline_layout,
-        },
+        render: pipeline_render,
+        tracing: pipeline_tracing,
     };
+
 
     // init_tracing_pipeline_layout(&app.device);
 
@@ -225,7 +232,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     compute_pass.dispatch_workgroups(1920, 1080, 1);
                 }
 
-                println!("Allo 1");
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
@@ -243,11 +249,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_pipeline(&pipelines.render.pipeline);
                     rpass.draw(0..3, 0..1);
                 }
-                println!("Allo 2");
 
                 app.queue.submit(Some(encoder.finish()));
                 frame.present();
             }
+
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..

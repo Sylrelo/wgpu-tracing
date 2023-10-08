@@ -1,4 +1,5 @@
-use wgpu::{BindGroup, BindGroupLayout, ComputePipeline, PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
+use bytemuck;
+use wgpu::{BindGroup, BindGroupLayout, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -11,6 +12,9 @@ pub struct ComputeContext {
     pub pipeline: ComputePipeline,
     pub bind_group: BindGroup,
     pub bind_group_layout: BindGroupLayout,
+
+    pub uniform: ComputeUniform,
+    pub uniform_buffer: Buffer,
 }
 
 pub struct RenderContext {
@@ -32,4 +36,13 @@ pub struct App {
     pub size: PhysicalSize<u32>,
     pub window: Window,
     pub swapchain_config: SwapchainData,
+}
+
+// UNIFORMS
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct ComputeUniform {
+    view_proj: [[f32; 4]; 4],
+    test: [f32; 4],
 }
