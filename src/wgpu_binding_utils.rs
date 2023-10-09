@@ -1,4 +1,90 @@
-use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, Device, ShaderStages};
+use std::cmp::min;
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferSize, Device, ShaderStages};
+use winit::event::VirtualKeyCode::P;
+
+
+pub struct BindingGeneratorBuilder<'a> {
+    binding_type: BindingType,
+    buffer_binding_type: BufferBindingType,
+    resource: Option<&'a Buffer>,
+}
+
+impl BindingGeneratorBuilder {
+    pub fn new() -> BindingGeneratorBuilder {
+
+        BindingGeneratorBuilder {
+            binding_type: BindingType::Buffer {
+                ty: Default::default(),
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            buffer_binding_type: BufferBindingType::Uniform,
+            resource: None,
+        }
+    }
+
+    pub fn visibility(mut self, shader_stage: ShaderStages) -> BindingGeneratorBuilder {
+        self
+    }
+
+    pub fn buffer_type(mut self, buffer_type: BindingType) -> BindingGeneratorBuilder {
+        self
+    }
+
+    pub fn with_buffer_type(
+        mut self,
+        has_dynamic_offset: bool,
+        min_binding_size: Option<BufferSize>,
+    ) -> BindingGeneratorBuilder {
+        self.binding_type = BindingType::Buffer {
+            ty: self.buffer_binding_type,
+            has_dynamic_offset,
+            min_binding_size,
+        };
+        self
+    }
+
+    pub fn with_uniform_binding(mut self) -> BindingGeneratorBuilder {
+        self.buffer_binding_type = BufferBindingType::Uniform;
+        self
+    }
+
+    pub fn with_compute_binding(mut self, read_only: bool) -> BindingGeneratorBuilder {
+        self.buffer_binding_type = BufferBindingType::Storage {
+            read_only
+        };
+        self
+    }
+
+    pub fn resource(mut self, buffer: &Buffer) -> BindingGeneratorBuilder {
+        self.resource = Some(buffer);
+        self
+    }
+
+    pub fn build(mut self) {
+        self.binding_type = match self.binding_type {
+            BindingType::Buffer {
+                has_dynamic_offset,
+                min_binding_size,
+                ..
+            } =>  BindingType::Buffer {
+                ty: self.buffer_binding_type,
+                has_dynamic_offset,
+                min_binding_size,
+            },
+            _ => {
+                panic!("Binding type not handled.");
+            }
+            // _ => self.binding_type,
+            // BindingType::Sampler(sampler_binding_type) => {}
+            // BindingType::Texture { .. } => {}
+            // BindingType::StorageTexture { .. } => {}
+        };
+
+        println!("{:?}", self.binding_type);
+    }
+}
+
 
 pub enum GenBindingType {
     Buffer,

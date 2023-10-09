@@ -8,7 +8,7 @@ pub struct InitWgpu {}
 
 impl InitWgpu {
     pub fn create_instance(window: &Window) -> (Instance, Surface) {
-        let instance = wgpu::Instance::new(InstanceDescriptor {
+        let instance = Instance::new(InstanceDescriptor {
             backends: Backends::DX12 | Backends::METAL | Backends::DX11,
             dx12_shader_compiler: Default::default(),
         });

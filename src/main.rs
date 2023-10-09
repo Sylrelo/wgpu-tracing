@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use cgmath::{Rad, SquareMatrix};
 use wgpu::TextureFormat;
 use winit::{
     event::{Event, WindowEvent},
@@ -15,7 +14,6 @@ use structs::{App, SwapchainData};
 use crate::compute_pipeline::init_tracing_pipeline;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
-use crate::wgpu_binding_utils::{gen_bindings, GenBindingBufferType, GenBindings, GenBindingType};
 
 mod init_wgpu;
 mod compute_pipeline;
@@ -144,14 +142,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut default_uniform = ComputeUniform::default();
     default_uniform.test = [0.3, 0.6, 0.9, 1.0];
 
-    let perspective_projection = cgmath::perspective(Rad(std::f32::consts::FRAC_PI_2), 1280.0 / 720.0, 0.01, 1000.0);
-
-
     // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
 
     println!("{:?}", default_uniform.view_proj);
 
-    let tray_stor_buffer = ComputeContext::buffers_init(&app.device);
+    // let tray_stor_buffer = ComputeContext::buffers_init(&app.device);
 
     let tray_uni_buffer = ComputeContext::uniform_init(&app.device, default_uniform);
 
