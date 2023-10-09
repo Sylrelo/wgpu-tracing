@@ -48,3 +48,11 @@ pub struct ComputeUniform {
     pub view_proj: [[f32; 4]; 4],
     pub test: [f32; 4],
 }
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct Triangle {
+   pub p0: [f32; 4],
+   pub p1: [f32; 4],
+   pub p2: [f32; 4],
+}

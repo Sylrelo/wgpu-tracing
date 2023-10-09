@@ -15,13 +15,13 @@ use structs::{App, SwapchainData};
 use crate::compute_pipeline::init_tracing_pipeline;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
-use crate::wgpu_utils::OPENGL_TO_WGPU_MATRIX;
+use crate::wgpu_binding_utils::{gen_bindings, GenBindingBufferType, GenBindings, GenBindingType};
 
 mod init_wgpu;
 mod compute_pipeline;
 mod init_render_pipeline;
 mod structs;
-mod wgpu_utils;
+mod wgpu_binding_utils;
 
 
 impl App {
@@ -147,11 +147,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let perspective_projection = cgmath::perspective(Rad(std::f32::consts::FRAC_PI_2), 1280.0 / 720.0, 0.01, 1000.0);
 
 
-    default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
+    // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
 
     println!("{:?}", default_uniform.view_proj);
 
+    let tray_stor_buffer = ComputeContext::buffers_init(&app.device);
+
     let tray_uni_buffer = ComputeContext::uniform_init(&app.device, default_uniform);
+
     let (
         tray_uni_layout,
         tray_uni_group
@@ -235,9 +238,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(..),
                 ..
             } => {
-                // Reconfigure the surface with the new size
-                app.config.width = app.size.width;
-                app.config.height = app.size.height;
+                let new_size = app.window.inner_size();
+                app.config.width = new_size.width;
+                app.config.height = new_size.height;
                 app.surface.configure(&app.device, &app.config);
                 // On macos the window needs to be redrawn manually after resizing
                 app.window.request_redraw();
@@ -251,6 +254,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
+                println!("Redraw");
                 let mut encoder = app.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 {

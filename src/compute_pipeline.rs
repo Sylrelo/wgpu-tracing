@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
-use wgpu::{BindGroup, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, ComputePipeline, ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, Queue, TextureView};
-use wgpu::util::DeviceExt;
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsages, ComputePipeline, ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, Queue, ShaderStages, TextureView};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
-use crate::structs::{ComputeContext, ComputeUniform};
+use crate::structs::{ComputeContext, ComputeUniform, Triangle};
+use crate::wgpu_binding_utils::{gen_bindings, GenBindingBufferType, GenBindings, GenBindingType};
 
 pub fn init_tracing_pipeline_layout(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -11,8 +12,8 @@ pub fn init_tracing_pipeline_layout(device: &Device) -> BindGroupLayout {
         entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::StorageTexture {
+                visibility: ShaderStages::COMPUTE,
+                ty: BindingType::StorageTexture {
                     view_dimension: wgpu::TextureViewDimension::D2,
                     format: wgpu::TextureFormat::Rgba8Unorm,
                     access: wgpu::StorageTextureAccess::WriteOnly,
@@ -62,10 +63,10 @@ pub fn init_tracing_pipeline(device: &Device, uniform_group_layout: BindGroupLay
 impl ComputeContext {
     pub fn uniform_init(device: &Device, uniform: ComputeUniform) -> Buffer {
         device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
+            &BufferInitDescriptor {
                 label: Some("[Compute Uniform] Buffer"),
                 contents: bytemuck::cast_slice(&[uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             }
         )
     }
@@ -80,35 +81,41 @@ impl ComputeContext {
     }
 
     pub fn uniform_create_binds(device: &Device, buffer: &Buffer) -> (BindGroupLayout, BindGroup) {
-        let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+        gen_bindings(
+            device,
+            vec![
+                GenBindings {
                     visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
+                    ty: GenBindingType::Buffer,
+                    ty_buffer: GenBindingBufferType::Uniform,
+                    resource: buffer,
                 }
-            ],
-            label: Some("[Compute Uniform] Group Layout"),
-        });
+            ])
+    }
 
+    pub fn buffers_init(device: &Device) -> Buffer {
+        let empty_vec: Vec<Triangle> = vec![];
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buffer.as_entire_binding(),
+        device.create_buffer_init(
+            &BufferInitDescriptor {
+                label: Some("[Compute Buffers] Init Buffer"),
+                contents: bytemuck::cast_slice(empty_vec.as_slice()),
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            }
+        )
+    }
+
+    pub fn buffers_create_binds(device: &Device, buffer: &Buffer) -> (BindGroupLayout, BindGroup) {
+        gen_bindings(
+            device,
+            vec![
+                GenBindings {
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: GenBindingType::Buffer,
+                    ty_buffer: GenBindingBufferType::Uniform,
+                    resource: buffer,
                 }
-            ],
-            label: Some("[Compute Uniform] Bind Group"),
-        });
-
-        return (group_layout, bind_group);
+            ])
     }
 }
 
