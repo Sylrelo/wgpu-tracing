@@ -19,7 +19,7 @@ mod init_wgpu;
 mod compute_pipeline;
 mod init_render_pipeline;
 mod structs;
-mod wgpu_binding_utils;
+mod utils;
 
 
 impl App {
@@ -140,7 +140,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     ///////////////////////////////////////////////////////////
 
     let mut default_uniform = ComputeUniform::default();
-    default_uniform.test = [0.3, 0.6, 0.9, 1.0];
+    default_uniform.test = [0.3, 0.2, 0.9, 1.0];
 
     // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
 

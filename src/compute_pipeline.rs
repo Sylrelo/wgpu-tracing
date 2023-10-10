@@ -4,7 +4,7 @@ use wgpu::{BindGroup, BindGroupEntry, BindGroupLayout, BindingResource, BindingT
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 use crate::structs::{ComputeContext, ComputeUniform};
-use crate::wgpu_binding_utils::BindingGeneratorBuilder;
+use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
 pub fn init_tracing_pipeline_layout(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

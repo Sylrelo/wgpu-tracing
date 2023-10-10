@@ -93,5 +93,5 @@ fn main(
         final_color = vec4(0.6, 0.6, 0.3, 1.0);
     }
 
-    textureStore(color_output, screen_pos, final_color);
+    textureStore(color_output, screen_pos, unidata.test * final_color);
 }

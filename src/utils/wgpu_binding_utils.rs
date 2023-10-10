@@ -1,11 +1,16 @@
-use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferSize, Device, ShaderStages};
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferSize, Device, Sampler, ShaderStages, TextureView};
 
 #[derive(Debug)]
-struct Context<'a> {
-    binding_type: BindingType,
-    buffer_binding_type: BufferBindingType,
-    resource: Option<&'a Buffer>,
-    visibility: ShaderStages,
+pub (super) struct Context<'a> {
+    pub (super) binding_type: BindingType,
+    pub (super) buffer_binding_type: BufferBindingType,
+    pub (super) visibility: ShaderStages,
+
+    pub (super) binding_resource: Option<BindingResource<'a>>,
+    
+    // pub (super) resource_buffer: Option<&'a Buffer>,
+    // pub (super) resource_texture_view: Option<&'a TextureView>,
+    // pub (super) resource_sampler: Option<&'a Sampler>,
 }
 
 #[derive(Debug)]
@@ -23,15 +28,35 @@ impl<'a> Context<'a> {
                 min_binding_size: None,
             },
             buffer_binding_type: BufferBindingType::Uniform,
-            resource: None,
+            // resource_buffer: None,
+            // resource_texture_view: None,
             visibility: ShaderStages::FRAGMENT,
+            // resource_sampler: None,
+            binding_resource: None,
         }
     }
+
+    pub fn set_buffer(&mut self, buffer: &'a Buffer) {
+        // match self.binding_type {
+        //     BindingType::Buffer { .. } => self.resource_buffer.unwrap().as_entire_binding(),
+        //     BindingType::Sampler(_) => BindingResource::Sampler(self.resource_sampler.unwrap()),
+        //     BindingType::Texture { .. } => BindingResource::TextureView(self.resource_texture_view.unwrap()),
+        //     BindingType::StorageTexture { .. } => {
+        //         panic!("Binding Type Resource not handled yet !")
+        //     }
+        // }
+        self.binding_resource = Some(buffer.as_entire_binding());
+    }
+
+    pub fn set_sampler() {}
+    pub fn set_texture_view() {}
+
+    pub fn set_storage_texture() {}
 }
 
 #[derive(Debug)]
 pub struct BindingGeneratorBuilder<'a> {
-    context: Context<'a>,
+    pub (super) context: Context<'a>,
     device: &'a Device,
 
     group_layout_entries: Vec<BindGroupLayoutEntry>,
@@ -95,11 +120,12 @@ impl<'a> BindingGeneratorBuilder<'a> {
     }
 
     pub fn resource(mut self, buffer: &'a Buffer) -> BindingGeneratorBuilder<'a> {
-        self.context.resource = Some(buffer);
+        // self.context.resource_buffer = Some(buffer.as_entire_binding());
+        self.context.set_buffer(buffer);
         self
     }
 
-    pub fn done(mut self) -> BindingGeneratorBuilder<'a> {
+    pub(super) fn context_done(&mut self) {
         self.context.binding_type = match self.context.binding_type {
             BindingType::Buffer {
                 has_dynamic_offset,
@@ -121,8 +147,23 @@ impl<'a> BindingGeneratorBuilder<'a> {
 
         self.create_entries();
         self.context = Context::new();
+    }
+
+    pub fn done(mut self) -> BindingGeneratorBuilder<'a> {
+        self.context_done();
         self
     }
+
+    // fn get_binding_resource(&self) -> BindingResource{
+    //     match self.context.binding_type {
+    //         BindingType::Buffer { .. } => self.context.resource_buffer.unwrap().as_entire_binding(),
+    //         BindingType::Sampler(_) => BindingResource::Sampler(self.context.resource_sampler.unwrap()),
+    //         BindingType::Texture { .. } => BindingResource::TextureView(self.context.resource_texture_view.unwrap()),
+    //         BindingType::StorageTexture { .. } => {
+    //             panic!("Binding Type Resource not handled yet !")
+    //         }
+    //     }
+    // }
 
     fn create_entries(&mut self) {
         let index = self.group_layout_entries.iter().count();
@@ -139,7 +180,7 @@ impl<'a> BindingGeneratorBuilder<'a> {
         self.group_entries.push(
             BindGroupEntry {
                 binding: index as u32,
-                resource: self.context.resource.unwrap().as_entire_binding(),
+                resource: self.context.binding_resource.clone().unwrap(),
             }
         );
     }
