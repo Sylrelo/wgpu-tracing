@@ -1,16 +1,17 @@
-use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferSize, Device, Sampler, ShaderStages, TextureView};
+#![allow(dead_code)]
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferSize,
+    Device, Sampler, ShaderStages, TextureView,
+};
 
 #[derive(Debug)]
-pub (super) struct Context<'a> {
-    pub (super) binding_type: BindingType,
-    pub (super) buffer_binding_type: BufferBindingType,
-    pub (super) visibility: ShaderStages,
+pub(super) struct Context<'a> {
+    pub(super) binding_type: BindingType,
+    pub(super) buffer_binding_type: BufferBindingType,
+    pub(super) visibility: ShaderStages,
 
-    pub (super) binding_resource: Option<BindingResource<'a>>,
-    
-    // pub (super) resource_buffer: Option<&'a Buffer>,
-    // pub (super) resource_texture_view: Option<&'a TextureView>,
-    // pub (super) resource_sampler: Option<&'a Sampler>,
+    pub(super) binding_resource: Option<BindingResource<'a>>,
 }
 
 #[derive(Debug)]
@@ -51,7 +52,7 @@ impl<'a> Context<'a> {
 
 #[derive(Debug)]
 pub struct BindingGeneratorBuilder<'a> {
-    pub (super) context: Context<'a>,
+    pub(super) context: Context<'a>,
     device: &'a Device,
 
     group_layout_entries: Vec<BindGroupLayoutEntry>,
@@ -68,17 +69,24 @@ impl<'a> BindingGeneratorBuilder<'a> {
         }
     }
 
-    pub fn with_default_buffer_storage(self, visibility: ShaderStages, buffer: &'a Buffer, read_only: bool) -> BindingGeneratorBuilder<'a> {
-        self
-            .with_buffer_type(false, None)
+    pub fn with_default_buffer_storage(
+        self,
+        visibility: ShaderStages,
+        buffer: &'a Buffer,
+        read_only: bool,
+    ) -> BindingGeneratorBuilder<'a> {
+        self.with_buffer_type(false, None)
             .with_storage_binding(read_only)
             .visibility(visibility)
             .resource(buffer)
     }
 
-    pub fn with_default_buffer_uniform(self, visibility: ShaderStages, buffer: &'a Buffer) -> BindingGeneratorBuilder<'a> {
-        self
-            .with_buffer_type(false, None)
+    pub fn with_default_buffer_uniform(
+        self,
+        visibility: ShaderStages,
+        buffer: &'a Buffer,
+    ) -> BindingGeneratorBuilder<'a> {
+        self.with_buffer_type(false, None)
             .with_uniform_binding()
             .visibility(visibility)
             .resource(buffer)
@@ -108,9 +116,7 @@ impl<'a> BindingGeneratorBuilder<'a> {
     }
 
     pub fn with_storage_binding(mut self, read_only: bool) -> BindingGeneratorBuilder<'a> {
-        self.context.buffer_binding_type = BufferBindingType::Storage {
-            read_only
-        };
+        self.context.buffer_binding_type = BufferBindingType::Storage { read_only };
         self
     }
 
@@ -162,30 +168,28 @@ impl<'a> BindingGeneratorBuilder<'a> {
     // }
 
     fn create_entries(&mut self) {
-        let index = self.group_layout_entries.iter().count();
+        let index = self.group_layout_entries.len();
 
-        self.group_layout_entries.push(
-            BindGroupLayoutEntry {
-                binding: index as u32,
-                visibility: self.context.visibility,
-                ty: self.context.binding_type,
-                count: None,
-            }
-        );
+        self.group_layout_entries.push(BindGroupLayoutEntry {
+            binding: index as u32,
+            visibility: self.context.visibility,
+            ty: self.context.binding_type,
+            count: None,
+        });
 
-        self.group_entries.push(
-            BindGroupEntry {
-                binding: index as u32,
-                resource: self.context.binding_resource.clone().unwrap(),
-            }
-        );
+        self.group_entries.push(BindGroupEntry {
+            binding: index as u32,
+            resource: self.context.binding_resource.clone().unwrap(),
+        });
     }
 
     fn generate_bindings(&self) -> BindGroups {
-        let bind_group_layout = self.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: self.group_layout_entries.as_slice(),
-            label: Some("Group Layout"),
-        });
+        let bind_group_layout = self
+            .device
+            .create_bind_group_layout(&BindGroupLayoutDescriptor {
+                entries: self.group_layout_entries.as_slice(),
+                label: Some("Group Layout"),
+            });
 
         let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
             layout: &bind_group_layout,

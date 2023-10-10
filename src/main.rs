@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
 use wgpu::TextureFormat;
+use winit::dpi::{PhysicalSize, Size};
+use winit::window::WindowBuilder;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use winit::dpi::{PhysicalSize, Size};
-use winit::window::WindowBuilder;
 
 use structs::{App, SwapchainData};
 
@@ -16,12 +16,11 @@ use crate::init_wgpu::InitWgpu;
 use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
-mod init_wgpu;
 mod compute_pipeline;
 mod init_render_pipeline;
+mod init_wgpu;
 mod structs;
 mod utils;
-
 
 impl App {
     pub async fn new(window: Window) -> App {
@@ -59,18 +58,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         depth_or_array_layers: 1,
     };
 
-    let diffuse_texture = app.device.create_texture(
-        &wgpu::TextureDescriptor {
-            size: texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::STORAGE_BINDING,
-            label: Some("diffuse_texture"),
-            view_formats: &[],
-        }
-    );
+    let diffuse_texture = app.device.create_texture(&wgpu::TextureDescriptor {
+        size: texture_size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::STORAGE_BINDING,
+        label: Some("diffuse_texture"),
+        view_formats: &[],
+    });
     app.queue.write_texture(
         wgpu::ImageCopyTexture {
             texture: &diffuse_texture,
@@ -103,8 +102,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     ///////////////////////////////////////////////////////////
 
-    let mut default_uniform = ComputeUniform::default();
-    default_uniform.test = [0.3, 0.2, 0.9, 1.0];
+    let default_uniform = ComputeUniform {
+        test: [0.3, 0.2, 0.9, 1.0],
+        ..Default::default()
+    };
 
     // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
 
@@ -114,16 +115,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let tray_uni_buffer = ComputeContext::uniform_init(&app.device, default_uniform);
 
-    let (
-        tray_uni_layout,
-        tray_uni_group
-    ) = ComputeContext::uniform_create_binds(&app.device, &tray_uni_buffer);
+    let (tray_uni_layout, tray_uni_group) =
+        ComputeContext::uniform_create_binds(&app.device, &tray_uni_buffer);
 
-    let (
-        tracing_group_layout,
-        tracing_group,
-        tracing_pipeline
-    ) = init_tracing_pipeline(&app.device, tray_uni_layout, &diffuse_texture_view);
+    let (tracing_group_layout, tracing_group, tracing_pipeline) =
+        init_tracing_pipeline(&app.device, tray_uni_layout, &diffuse_texture_view);
 
     let pipeline_tracing = ComputeContext {
         pipeline: tracing_pipeline,
@@ -138,38 +134,41 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     ///////////////////////////////////////////////////////////
 
-    let shader = app.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-    });
+    let shader = app
+        .device
+        .create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+        });
 
-    let pipeline_layout = app.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: None,
-        bind_group_layouts: &[
-            &render_texture_bindgroups.bind_group_layout,
-        ],
-        push_constant_ranges: &[],
-    });
+    let pipeline_layout = app
+        .device
+        .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&render_texture_bindgroups.bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
-    let render_pipeline = app.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: None,
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: "vs_main",
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: "fs_main",
-            targets: &[Some(app.swapchain_config.format.into())],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview: None,
-    });
-
+    let render_pipeline = app
+        .device
+        .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(app.swapchain_config.format.into())],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
 
     app.surface.configure(&app.device, &app.config);
 
@@ -182,7 +181,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         render: pipeline_render,
         tracing: pipeline_tracing,
     };
-
 
     // init_tracing_pipeline_layout(&app.device);
 
@@ -205,7 +203,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                let frame = app.surface
+                let frame = app
+                    .surface
                     .get_current_texture()
                     .expect("Failed to acquire next swap chain texture");
 
@@ -214,12 +213,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
                 println!("Redraw");
-                let mut encoder = app.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                let mut encoder = app
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 {
-                    let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                        label: None,
-                    });
+                    let mut compute_pass =
+                        encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
 
                     compute_pass.set_pipeline(&pipelines.tracing.pipeline);
                     compute_pass.set_bind_group(0, &pipelines.tracing.bind_group, &[]);
@@ -262,13 +262,9 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_visible(false)
-        .with_inner_size(
-            Size::from(
-                PhysicalSize::new(1280, 720)
-            )
-        )
-        .build(&event_loop).unwrap();
-
+        .with_inner_size(Size::from(PhysicalSize::new(1280, 720)))
+        .build(&event_loop)
+        .unwrap();
 
     #[cfg(not(target_arch = "wasm32"))]
     {

@@ -1,5 +1,7 @@
-use bytemuck;
-use wgpu::{BindGroup, BindGroupLayout, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
+use wgpu::{
+    BindGroup, BindGroupLayout, Buffer, ComputePipeline, PipelineLayout, RenderPipeline,
+    SurfaceCapabilities, TextureFormat,
+};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -52,7 +54,7 @@ pub struct ComputeUniform {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Triangle {
-   pub p0: [f32; 4],
-   pub p1: [f32; 4],
-   pub p2: [f32; 4],
+    pub p0: [f32; 4],
+    pub p1: [f32; 4],
+    pub p2: [f32; 4],
 }

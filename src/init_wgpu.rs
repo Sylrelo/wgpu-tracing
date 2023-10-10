@@ -1,4 +1,6 @@
-use wgpu::{Adapter, Backends, Device, Instance, InstanceDescriptor, Queue, Surface, SurfaceConfiguration};
+use wgpu::{
+    Adapter, Backends, Device, Instance, InstanceDescriptor, Queue, Surface, SurfaceConfiguration,
+};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -15,15 +17,18 @@ impl InitWgpu {
 
         let surface = unsafe { instance.create_surface(&window) }.unwrap();
 
-        return (instance, surface);
+        (instance, surface)
     }
 
-    pub async fn get_device_and_queue(instance: &Instance, surface: &Surface) -> (Adapter, Device, Queue) {
+    pub async fn get_device_and_queue(
+        instance: &Instance,
+        surface: &Surface,
+    ) -> (Adapter, Device, Queue) {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 force_fallback_adapter: false,
-                compatible_surface: Some(&surface),
+                compatible_surface: Some(surface),
             })
             .await
             .expect("Failed to find an appropriate adapter");
@@ -40,7 +45,7 @@ impl InitWgpu {
             .await
             .expect("Failed to create device");
 
-        return (adapter, device, queue);
+        (adapter, device, queue)
     }
 
     pub fn get_swapchain_config(surface: &Surface, adapter: &Adapter) -> SwapchainData {
@@ -53,7 +58,10 @@ impl InitWgpu {
         }
     }
 
-    pub fn init_config(swapchain_config: &SwapchainData, size: &PhysicalSize<u32>) -> SurfaceConfiguration {
+    pub fn init_config(
+        swapchain_config: &SwapchainData,
+        size: &PhysicalSize<u32>,
+    ) -> SurfaceConfiguration {
         SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: swapchain_config.format,
