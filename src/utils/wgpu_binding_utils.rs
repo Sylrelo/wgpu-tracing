@@ -37,21 +37,16 @@ impl<'a> Context<'a> {
     }
 
     pub fn set_buffer(&mut self, buffer: &'a Buffer) {
-        // match self.binding_type {
-        //     BindingType::Buffer { .. } => self.resource_buffer.unwrap().as_entire_binding(),
-        //     BindingType::Sampler(_) => BindingResource::Sampler(self.resource_sampler.unwrap()),
-        //     BindingType::Texture { .. } => BindingResource::TextureView(self.resource_texture_view.unwrap()),
-        //     BindingType::StorageTexture { .. } => {
-        //         panic!("Binding Type Resource not handled yet !")
-        //     }
-        // }
         self.binding_resource = Some(buffer.as_entire_binding());
     }
 
-    pub fn set_sampler() {}
-    pub fn set_texture_view() {}
+    pub fn set_sampler(&mut self, sampler: &'a Sampler) {
+        self.binding_resource = Some(BindingResource::Sampler(sampler));
+    }
 
-    pub fn set_storage_texture() {}
+    pub fn set_texture_view(&mut self, texture_view: &'a TextureView) {
+        self.binding_resource = Some(BindingResource::TextureView(texture_view));
+    }
 }
 
 #[derive(Debug)]
@@ -136,16 +131,17 @@ impl<'a> BindingGeneratorBuilder<'a> {
                 has_dynamic_offset,
                 min_binding_size,
             },
+            BindingType::Sampler(_) => self.context.binding_type,
+            BindingType::Texture { .. } => self.context.binding_type,
+            // BindingType::StorageTexture { .. } => {}
+            // _ => self.context.binding_type,
             _ => {
                 panic!("Binding type not handled.");
             }
-            // _ => self.binding_type,
-            // BindingType::Sampler(sampler_binding_type) => {}
-            // BindingType::Texture { .. } => {}
-            // BindingType::StorageTexture { .. } => {}
         };
 
         self.create_entries();
+        self.context.binding_resource = None;
         self.context = Context::new();
     }
 

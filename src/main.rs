@@ -14,6 +14,7 @@ use structs::{App, SwapchainData};
 use crate::compute_pipeline::init_tracing_pipeline;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
+use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
 mod init_wgpu;
 mod compute_pipeline;
@@ -96,46 +97,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ..Default::default()
     });
 
-    let texture_bind_group_layout =
-        app.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    // This should match the filterable field of the
-                    // corresponding Texture entry above.
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("texture_bind_group_layout"),
-        });
-    let diffuse_bind_group = app.device.create_bind_group(
-        &wgpu::BindGroupDescriptor {
-            layout: &texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&diffuse_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
-                }
-            ],
-            label: Some("diffuse_bind_group"),
-        }
-    );
+    let render_texture_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_and_sampler(&diffuse_texture_view, &diffuse_sampler)
+        .build();
 
     ///////////////////////////////////////////////////////////
 
@@ -182,7 +146,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let pipeline_layout = app.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
         bind_group_layouts: &[
-            &texture_bind_group_layout,
+            &render_texture_bindgroups.bind_group_layout,
         ],
         push_constant_ranges: &[],
     });
@@ -276,7 +240,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         })],
                         depth_stencil_attachment: None,
                     });
-                    rpass.set_bind_group(0, &diffuse_bind_group, &[]); // NEW!
+                    rpass.set_bind_group(0, &render_texture_bindgroups.bind_group, &[]); // NEW!
                     rpass.set_pipeline(&pipelines.render.pipeline);
                     rpass.draw(0..3, 0..1);
                 }
