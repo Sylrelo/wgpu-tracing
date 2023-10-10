@@ -1,18 +1,22 @@
-use std::cmp::min;
 use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferSize, Device, ShaderStages};
-use winit::event::VirtualKeyCode::P;
 
-
-pub struct BindingGeneratorBuilder<'a> {
+#[derive(Debug)]
+struct Context<'a> {
     binding_type: BindingType,
     buffer_binding_type: BufferBindingType,
     resource: Option<&'a Buffer>,
+    visibility: ShaderStages,
 }
 
-impl BindingGeneratorBuilder {
-    pub fn new() -> BindingGeneratorBuilder {
+#[derive(Debug)]
+pub struct BindGroups {
+    pub bind_group_layout: BindGroupLayout,
+    pub bind_group: BindGroup,
+}
 
-        BindingGeneratorBuilder {
+impl<'a> Context<'a> {
+    pub fn new() -> Context<'a> {
+        Context {
             binding_type: BindingType::Buffer {
                 ty: Default::default(),
                 has_dynamic_offset: false,
@@ -20,55 +24,89 @@ impl BindingGeneratorBuilder {
             },
             buffer_binding_type: BufferBindingType::Uniform,
             resource: None,
+            visibility: ShaderStages::FRAGMENT,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct BindingGeneratorBuilder<'a> {
+    context: Context<'a>,
+    device: &'a Device,
+
+    group_layout_entries: Vec<BindGroupLayoutEntry>,
+    group_entries: Vec<BindGroupEntry<'a>>,
+}
+
+impl<'a> BindingGeneratorBuilder<'a> {
+    pub fn new(device: &'a Device) -> BindingGeneratorBuilder<'a> {
+        BindingGeneratorBuilder {
+            context: Context::new(),
+            device,
+            group_layout_entries: vec![],
+            group_entries: vec![],
         }
     }
 
-    pub fn visibility(mut self, shader_stage: ShaderStages) -> BindingGeneratorBuilder {
+    pub fn with_default_buffer_storage(self, visibility: ShaderStages, buffer: &'a Buffer, read_only: bool) -> BindingGeneratorBuilder<'a> {
         self
+            .with_buffer_type(false, None)
+            .with_storage_binding(read_only)
+            .visibility(visibility)
+            .resource(buffer)
     }
 
-    pub fn buffer_type(mut self, buffer_type: BindingType) -> BindingGeneratorBuilder {
+    pub fn with_default_buffer_uniform(self, visibility: ShaderStages, buffer: &'a Buffer) -> BindingGeneratorBuilder<'a> {
         self
+            .with_buffer_type(false, None)
+            .with_uniform_binding()
+            .visibility(visibility)
+            .resource(buffer)
     }
 
     pub fn with_buffer_type(
         mut self,
         has_dynamic_offset: bool,
         min_binding_size: Option<BufferSize>,
-    ) -> BindingGeneratorBuilder {
-        self.binding_type = BindingType::Buffer {
-            ty: self.buffer_binding_type,
+    ) -> BindingGeneratorBuilder<'a> {
+        self.context.binding_type = BindingType::Buffer {
+            ty: self.context.buffer_binding_type,
             has_dynamic_offset,
             min_binding_size,
         };
         self
     }
 
-    pub fn with_uniform_binding(mut self) -> BindingGeneratorBuilder {
-        self.buffer_binding_type = BufferBindingType::Uniform;
+    pub fn visibility(mut self, shader_stage: ShaderStages) -> BindingGeneratorBuilder<'a> {
+        self.context.visibility = shader_stage;
         self
     }
 
-    pub fn with_compute_binding(mut self, read_only: bool) -> BindingGeneratorBuilder {
-        self.buffer_binding_type = BufferBindingType::Storage {
+    pub fn with_uniform_binding(mut self) -> BindingGeneratorBuilder<'a> {
+        self.context.buffer_binding_type = BufferBindingType::Uniform;
+        self
+    }
+
+    pub fn with_storage_binding(mut self, read_only: bool) -> BindingGeneratorBuilder<'a> {
+        self.context.buffer_binding_type = BufferBindingType::Storage {
             read_only
         };
         self
     }
 
-    pub fn resource(mut self, buffer: &Buffer) -> BindingGeneratorBuilder {
-        self.resource = Some(buffer);
+    pub fn resource(mut self, buffer: &'a Buffer) -> BindingGeneratorBuilder<'a> {
+        self.context.resource = Some(buffer);
         self
     }
 
-    pub fn build(mut self) {
-        self.binding_type = match self.binding_type {
+    pub fn done(mut self) -> BindingGeneratorBuilder<'a> {
+        self.context.binding_type = match self.context.binding_type {
             BindingType::Buffer {
                 has_dynamic_offset,
                 min_binding_size,
                 ..
-            } =>  BindingType::Buffer {
-                ty: self.buffer_binding_type,
+            } => BindingType::Buffer {
+                ty: self.context.buffer_binding_type,
                 has_dynamic_offset,
                 min_binding_size,
             },
@@ -81,87 +119,55 @@ impl BindingGeneratorBuilder {
             // BindingType::StorageTexture { .. } => {}
         };
 
-        println!("{:?}", self.binding_type);
+        self.create_entries();
+        self.context = Context::new();
+        self
     }
-}
 
+    fn create_entries(&mut self) {
+        let index = self.group_layout_entries.iter().count();
 
-pub enum GenBindingType {
-    Buffer,
-}
-
-pub enum GenBindingBufferType {
-    Storage,
-    Uniform,
-}
-
-pub struct GenBindings<'a> {
-    pub visibility: ShaderStages,
-    pub ty: GenBindingType,
-    pub ty_buffer: GenBindingBufferType,
-    pub resource: &'a Buffer,
-}
-
-pub fn gen_binding_entries(
-    entries: Vec<GenBindings>,
-) -> (Vec<BindGroupLayoutEntry>, Vec<BindGroupEntry>)
-{
-    let mut group_layout_entries: Vec<BindGroupLayoutEntry> = vec![];
-    let mut bind_group_entries: Vec<BindGroupEntry> = vec![];
-
-    for (index, genbinding) in entries.iter().enumerate() {
-        let type_buffer = match genbinding.ty_buffer {
-            GenBindingBufferType::Storage => BufferBindingType::Storage {
-                read_only: true,
-            },
-            GenBindingBufferType::Uniform => BufferBindingType::Uniform,
-        };
-
-        let ty = match genbinding.ty {
-            GenBindingType::Buffer => BindingType::Buffer {
-                ty: type_buffer,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            }
-        };
-
-        group_layout_entries.push(
+        self.group_layout_entries.push(
             BindGroupLayoutEntry {
                 binding: index as u32,
-                visibility: genbinding.visibility,
-                ty,
+                visibility: self.context.visibility,
+                ty: self.context.binding_type,
                 count: None,
             }
         );
-        
-        bind_group_entries.push(
+
+        self.group_entries.push(
             BindGroupEntry {
                 binding: index as u32,
-                resource: genbinding.resource.as_entire_binding(),
+                resource: self.context.resource.unwrap().as_entire_binding(),
             }
-        )
+        );
     }
 
-    return (group_layout_entries, bind_group_entries);
-}
+    fn generate_bindings(&self) -> BindGroups {
+        let bind_group_layout = self.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            entries: self.group_layout_entries.as_slice(),
+            label: Some("Group Layout"),
+        });
 
-pub fn gen_bindings(
-    device: &Device,
-    entries: Vec<GenBindings>,
-) -> (BindGroupLayout, BindGroup)
-{
-    let (layout_entries, group_entries) = gen_binding_entries(entries);
+        let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: self.group_entries.as_slice(),
+            label: Some("Bind Group"),
+        });
 
-    let group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        entries: layout_entries.as_slice(),
-        label: Some("Group Layout"),
-    });
+        BindGroups {
+            bind_group_layout,
+            bind_group,
+        }
+    }
 
-    let bind_group = device.create_bind_group(&BindGroupDescriptor {
-        layout: &group_layout,
-        entries: group_entries.as_slice(),
-        label: Some("Bind Group"),
-    });
+    pub fn build(mut self) -> BindGroups {
+        let bind_groups = self.generate_bindings();
 
-    return (group_layout, bind_group);
+        self.group_layout_entries.clear();
+        self.group_entries.clear();
+
+        bind_groups
+    }
 }
