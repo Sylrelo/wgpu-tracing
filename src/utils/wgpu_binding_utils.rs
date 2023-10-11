@@ -181,9 +181,16 @@ impl<'a> BindingGeneratorBuilder<'a> {
             binding: index as u32,
             resource: self.context.binding_resource.clone().unwrap(),
         });
+
+        println!("{:?}", self.group_layout_entries);
+        println!("{:?}", self.group_entries);
     }
 
     fn generate_bindings(&self) -> BindGroups {
+        if self.group_layout_entries.is_empty() || self.group_entries.is_empty() {
+            panic!("Generated bind group is empty, did you forget to call .done() ?");
+        }
+
         let bind_group_layout = self
             .device
             .create_bind_group_layout(&BindGroupLayoutDescriptor {

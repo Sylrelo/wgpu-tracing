@@ -3,11 +3,20 @@ struct ComputeUniform {
     test: vec4<f32>,
 }
 
+struct Triangle {
+    p0: vec4<f32>,
+    p1: vec4<f32>,
+    p2: vec4<f32>,
+}
+
 @group(0) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
 
 @group(1) @binding(0)
 var<uniform> unidata: ComputeUniform;
+
+@group(2) @binding(0)
+var<storage> triangles: array<Triangle>;
 
 fn intersect_triangle(
     ray_origin: vec3<f32>,
@@ -27,7 +36,7 @@ fn intersect_triangle(
     }
 
     let f = 1.0 / a;
-    let s = ray_origin  - p0;
+    let s = ray_origin - p0;
     let u = f * dot(s, h);
 
     if (u < 0.0 || u > 1.0) {
@@ -68,30 +77,32 @@ fn main(
         1.0 - 2.0 * f32(ndc_pixel.y) * tatan
     );
 
-    let ray_origin = vec3(0.0, 0.0, 5.0);
+    let ray_origin = vec3(0.0, 0.0, 10.0);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0) - ray_origin);
 
     var total_dist = 0.0;
     var final_color = vec4<f32>(0.1, 0.1, 0.0, 1.0);
 
-    for(var i = 0; i < 256; i++) {
-        let t = length(ray_origin + total_dist * ray_direction) - 1.0;
+    let tot = i32(arrayLength(&triangles));
+    var t_dst = 100000;
+    for (var i = 0; i < tot; i++) {
+        let tri = triangles[i];
 
-        if (t <= 0.1) {
-            final_color = vec4(0.3, 0.3, 0.8, 1.0);
-            break;
-        }
+        let t = intersect_triangle(
+            ray_origin,
+            ray_direction,
+            tri.p0.xyz,
+            tri.p1.xyz,
+            tri.p2.xyz
+        );
 
-        total_dist += t;
-
-        if (total_dist > 100.0) {
-            break;
+        if (t > 0.0) {
+            final_color = vec4(0.6, 0.6, 0.3, 1.0);
         }
     }
-
-    if (intersect_triangle(ray_origin, ray_direction, vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0)) > 0.0) {
-        final_color = vec4(0.6, 0.6, 0.3, 1.0);
-    }
+//    if (intersect_triangle(ray_origin, ray_direction, vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0)) > 0.0) {
+//        final_color = vec4(0.6, 0.6, 0.3, 1.0);
+//    }
 
     textureStore(color_output, screen_pos, unidata.test * final_color);
 }

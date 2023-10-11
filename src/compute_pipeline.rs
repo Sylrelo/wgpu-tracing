@@ -2,16 +2,16 @@ use std::borrow::Cow;
 
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
-    BindGroup, BindGroupEntry, BindGroupLayout, BindingResource, BindingType, Buffer, BufferUsages,
-    ComputePipeline, ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, Queue,
-    ShaderStages, TextureView,
+    BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, BindingResource, BindingType,
+    Buffer, BufferBindingType, BufferUsages, ComputePipeline, ComputePipelineDescriptor, Device,
+    Label, PipelineLayoutDescriptor, Queue, ShaderStages, TextureView,
 };
 
 use crate::structs::{ComputeContext, ComputeUniform};
-use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
+use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
-pub fn init_tracing_pipeline_layout(device: &Device) -> BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+pub fn init_tracing_pipeline_layout(device: &Device, texture_view: &TextureView) -> BindGroups {
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("My fancy compute bindings"),
         entries: &[wgpu::BindGroupLayoutEntry {
             binding: 0,
@@ -23,24 +23,35 @@ pub fn init_tracing_pipeline_layout(device: &Device) -> BindGroupLayout {
             },
             count: None,
         }],
-    })
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &bind_group_layout,
+        entries: &[BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::TextureView(texture_view),
+        }],
+    });
+
+    BindGroups {
+        bind_group_layout,
+        bind_group,
+    }
 }
 
 pub fn init_tracing_pipeline(
     device: &Device,
-    uniform_group_layout: BindGroupLayout,
-    texture: &TextureView,
-) -> (BindGroupLayout, BindGroup, ComputePipeline) {
+    bind_group_layouts: &[&BindGroupLayout],
+) -> ComputePipeline {
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Label::from("Tracing Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("compute.wgsl"))),
     });
 
-    let bind_group_layout = init_tracing_pipeline_layout(device);
-
     let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Label::from("Tracing Layout"),
-        bind_group_layouts: &[&bind_group_layout, &uniform_group_layout],
+        bind_group_layouts,
         push_constant_ranges: &[],
     });
 
@@ -51,16 +62,7 @@ pub fn init_tracing_pipeline(
         entry_point: "main",
     });
 
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &bind_group_layout,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::TextureView(texture),
-        }],
-    });
-
-    (bind_group_layout, bind_group, pipeline)
+    pipeline
 }
 
 impl ComputeContext {

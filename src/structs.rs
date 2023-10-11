@@ -58,3 +58,9 @@ pub struct Triangle {
     pub p1: [f32; 4],
     pub p2: [f32; 4],
 }
+
+// #[repr(C)]
+// #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+// pub struct TriangleBinding {
+//     pub triangles: Vec<Triangle>,
+// }

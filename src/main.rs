@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use wgpu::TextureFormat;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::PrimitiveTopology::TriangleList;
+use wgpu::{BufferUsages, ShaderStages, TextureFormat};
 use winit::dpi::{PhysicalSize, Size};
 use winit::window::WindowBuilder;
 use winit::{
@@ -11,9 +13,9 @@ use winit::{
 
 use structs::{App, SwapchainData};
 
-use crate::compute_pipeline::init_tracing_pipeline;
+use crate::compute_pipeline::{init_tracing_pipeline, init_tracing_pipeline_layout};
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext};
+use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext, Triangle};
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
 mod compute_pipeline;
@@ -107,6 +109,41 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ..Default::default()
     };
 
+    let test_triangles_list = vec![
+        Triangle {
+            p0: [0.0, 0.0, 0.0, 0.0],
+            p1: [0.5, 0.0, 0.0, 0.0],
+            p2: [0.5, 0.5, 0.0, 0.0],
+        },
+        Triangle {
+            p0: [0.0, 0.5, 0.0, 0.0],
+            p1: [0.5, 0.5, 0.0, 0.0],
+            p2: [0.5, 1.0, 0.0, 0.0],
+        },
+        Triangle {
+            p0: [0.0, -0.5, 0.0, 0.0],
+            p1: [-0.5, -0.5, 0.0, 0.0],
+            p2: [-0.5, -1.0, 0.0, 0.0],
+        },
+    ];
+
+    // let grosse_pute = TriangleBinding {
+    //     triangles: test_triangles_list,
+    // };
+
+    let triangle_buffer = app.device.create_buffer_init(&BufferInitDescriptor {
+        label: Some("[Compute Uniform] Buffer"),
+        contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
+        usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+    });
+
+    println!("=========================");
+    let triangle_buffer_binding = BindingGeneratorBuilder::new(&app.device)
+        .with_default_buffer_storage(ShaderStages::COMPUTE, &triangle_buffer, true)
+        .done()
+        .build();
+    println!("=========================");
+
     // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
 
     println!("{:?}", default_uniform.view_proj);
@@ -118,13 +155,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let (tray_uni_layout, tray_uni_group) =
         ComputeContext::uniform_create_binds(&app.device, &tray_uni_buffer);
 
-    let (tracing_group_layout, tracing_group, tracing_pipeline) =
-        init_tracing_pipeline(&app.device, tray_uni_layout, &diffuse_texture_view);
+    let render_texture_bind_groups =
+        init_tracing_pipeline_layout(&app.device, &diffuse_texture_view);
+
+    let tracing_pipeline = init_tracing_pipeline(
+        &app.device,
+        &[
+            &render_texture_bind_groups.bind_group_layout,
+            &tray_uni_layout,
+            &triangle_buffer_binding.bind_group_layout,
+        ],
+    );
 
     let pipeline_tracing = ComputeContext {
         pipeline: tracing_pipeline,
-        bind_group: tracing_group,
-        bind_group_layout: tracing_group_layout,
+        bind_group: render_texture_bind_groups.bind_group,
+        bind_group_layout: render_texture_bind_groups.bind_group_layout,
         uniform: default_uniform,
         uniform_buffer: tray_uni_buffer,
         uniform_bind_group: tray_uni_group,
@@ -224,6 +270,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     compute_pass.set_pipeline(&pipelines.tracing.pipeline);
                     compute_pass.set_bind_group(0, &pipelines.tracing.bind_group, &[]);
                     compute_pass.set_bind_group(1, &pipelines.tracing.uniform_bind_group, &[]);
+                    compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
                     compute_pass.dispatch_workgroups(1920, 1080, 1);
                 }
 
