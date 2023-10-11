@@ -96,85 +96,23 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ..Default::default()
     });
 
-    let render_texture_bindgroups = BindingGeneratorBuilder::new(&app.device)
-        .with_texture_and_sampler(&diffuse_texture_view, &diffuse_sampler)
-        .build();
-
     ///////////////////////////////////////////////////////////
-
     // let default_uniform = ComputeUniform {
     //     test: [0.3, 0.2, 0.9, 1.0],
     //     ..Default::default()
     // };
-
-    // let test_triangles_list = vec![
-    //     Triangle {
-    //         p0: [0.0, 0.0, 0.0, 0.0],
-    //         p1: [0.5, 0.0, 0.0, 0.0],
-    //         p2: [0.5, 0.5, 0.0, 0.0],
-    //     },
-    //     Triangle {
-    //         p0: [0.0, 0.5, 0.0, 0.0],
-    //         p1: [0.5, 0.5, 0.0, 0.0],
-    //         p2: [0.5, 1.0, 0.0, 0.0],
-    //     },
-    //     Triangle {
-    //         p0: [0.0, -0.5, 0.0, 0.0],
-    //         p1: [-0.5, -0.5, 0.0, 0.0],
-    //         p2: [-0.5, -1.0, 0.0, 0.0],
-    //     },
-    // ];
-    //
-    // let triangle_buffer = app.device.create_buffer_init(&BufferInitDescriptor {
-    //     label: Some("[Compute Uniform] Buffer"),
-    //     contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
-    //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-    // });
-
-    // println!("=========================");
-    // let triangle_buffer_binding = BindingGeneratorBuilder::new(&app.device)
-    //     .with_default_buffer_storage(ShaderStages::COMPUTE, &triangle_buffer, true)
-    //     .done()
-    //     .build();
-    // println!("=========================");
-
     // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
-
     // println!("{:?}", default_uniform.view_proj);
-
     // let tray_stor_buffer = ComputeContext::buffers_init(&app.device);
-
     // let tray_uni_buffer = TracingPipeline::uniform_init(&app.device, default_uniform);
-
     // let (tray_uni_layout, tray_uni_group) =
     //     TracingPipeline::uniform_create_binds(&app.device, &tray_uni_buffer);
-
-    // let render_texture_bind_groups =
-    //     init_tracing_binding_render_texture(&app.device, &diffuse_texture_view);
-
-    // let tracing_pipeline = TracingPipeline::init_pipeline(
-    //     &app.device,
-    //     &[
-    //         &render_texture_bind_groups.bind_group_layout,
-    //         &tray_uni_layout,
-    //         &triangle_buffer_binding.bind_group_layout,
-    //     ],
-    // );
-
-    // let pipeline_tracing = TracingPipeline {
-    //     pipeline: tracing_pipeline,
-    //     bind_group: render_texture_bind_groups.bind_group,
-    //     bind_group_layout: render_texture_bind_groups.bind_group_layout,
-    //     uniform: default_uniform,
-    //     uniform_buffer: tray_uni_buffer,
-    //     uniform_bind_group: tray_uni_group,
-    // };
-
     // pipeline_tracing.uniform_update(&app.queue);
+    ///////////////////////////////////////////////////////////
 
     let tracing_pipeline = TracingPipeline::new(&app.device, &diffuse_texture_view);
 
-    ///////////////////////////////////////////////////////////
+    //////////
 
     let shader = app
         .device
@@ -182,6 +120,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
         });
+
+    let render_texture_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_and_sampler(&diffuse_texture_view, &diffuse_sampler)
+        .build();
 
     let pipeline_layout = app
         .device
@@ -229,8 +171,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     app.window.set_visible(true);
 
     event_loop.run(move |event, _, control_flow| {
-        // let _ = (&instance, &adapter, &shader, &pipeline_layout);
-
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent {
@@ -259,20 +199,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-                {
-                    let mut compute_pass =
-                        encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-
-                    compute_pass.set_pipeline(&tracing_pipeline.pipeline);
-                    compute_pass.set_bind_group(
-                        0,
-                        &tracing_pipeline.render_texture_binds.bind_group,
-                        &[],
-                    );
-                    compute_pass.set_bind_group(1, &tracing_pipeline.storage_binds.bind_group, &[]);
-                    // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
-                    compute_pass.dispatch_workgroups(1920, 1080, 1);
-                }
+                tracing_pipeline.compute_pass(&mut encoder);
 
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

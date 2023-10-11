@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
-    BindGroupLayout, Buffer, BufferUsages, ComputePipeline, ComputePipelineDescriptor, Device,
-    Label, PipelineLayoutDescriptor, ShaderStages, TextureView,
+    BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
+    ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderStages, TextureView,
 };
 
 use crate::structs::Triangle;
@@ -104,6 +104,16 @@ impl TracingPipeline {
             // uniform_buffer: (),
             triangles_buffer,
         }
+    }
+
+    pub fn compute_pass(&self, encoder: &mut CommandEncoder) {
+        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor { label: None });
+
+        compute_pass.set_pipeline(&self.pipeline);
+        compute_pass.set_bind_group(0, &self.render_texture_binds.bind_group, &[]);
+        compute_pass.set_bind_group(1, &self.storage_binds.bind_group, &[]);
+        // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
+        compute_pass.dispatch_workgroups(1920, 1080, 1);
     }
 
     // pub fn uniform_init(device: &Device, uniform: ComputeUniform) -> Buffer {
