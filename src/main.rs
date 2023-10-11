@@ -13,7 +13,7 @@ use winit::{
 
 use structs::{App, SwapchainData};
 
-use crate::compute_pipeline::{init_tracing_pipeline, init_tracing_pipeline_layout};
+use crate::compute_pipeline::{init_tracing_binding_render_texture, init_tracing_pipeline};
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext, Triangle};
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
@@ -127,10 +127,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         },
     ];
 
-    // let grosse_pute = TriangleBinding {
-    //     triangles: test_triangles_list,
-    // };
-
     let triangle_buffer = app.device.create_buffer_init(&BufferInitDescriptor {
         label: Some("[Compute Uniform] Buffer"),
         contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
@@ -156,7 +152,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ComputeContext::uniform_create_binds(&app.device, &tray_uni_buffer);
 
     let render_texture_bind_groups =
-        init_tracing_pipeline_layout(&app.device, &diffuse_texture_view);
+        init_tracing_binding_render_texture(&app.device, &diffuse_texture_view);
 
     let tracing_pipeline = init_tracing_pipeline(
         &app.device,

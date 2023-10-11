@@ -10,34 +10,15 @@ use wgpu::{
 use crate::structs::{ComputeContext, ComputeUniform};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
-pub fn init_tracing_pipeline_layout(device: &Device, texture_view: &TextureView) -> BindGroups {
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("My fancy compute bindings"),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStages::COMPUTE,
-            ty: BindingType::StorageTexture {
-                view_dimension: wgpu::TextureViewDimension::D2,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                access: wgpu::StorageTextureAccess::WriteOnly,
-            },
-            count: None,
-        }],
-    });
-
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &bind_group_layout,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::TextureView(texture_view),
-        }],
-    });
-
-    BindGroups {
-        bind_group_layout,
-        bind_group,
-    }
+pub fn init_tracing_binding_render_texture(
+    device: &Device,
+    texture_view: &TextureView,
+) -> BindGroups {
+    BindingGeneratorBuilder::new(device)
+        .with_default_storage_texture(texture_view)
+        .visibility(ShaderStages::COMPUTE)
+        .done()
+        .build()
 }
 
 pub fn init_tracing_pipeline(

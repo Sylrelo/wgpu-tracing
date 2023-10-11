@@ -139,7 +139,7 @@ impl<'a> BindingGeneratorBuilder<'a> {
             },
             BindingType::Sampler(_) => self.context.binding_type,
             BindingType::Texture { .. } => self.context.binding_type,
-            // BindingType::StorageTexture { .. } => {}
+            BindingType::StorageTexture { .. } => self.context.binding_type,
             // _ => self.context.binding_type,
             _ => {
                 panic!("Binding type not handled.");
