@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::PrimitiveTopology::TriangleList;
-use wgpu::{BufferUsages, ShaderStages, TextureFormat};
+use wgpu::TextureFormat;
 use winit::dpi::{PhysicalSize, Size};
 use winit::window::WindowBuilder;
 use winit::{
@@ -13,9 +11,9 @@ use winit::{
 
 use structs::{App, SwapchainData};
 
-use crate::compute_pipeline::{init_tracing_binding_render_texture, init_tracing_pipeline};
+use crate::compute_pipeline::TracingPipeline;
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{ComputeContext, ComputeUniform, Pipelines, RenderContext, Triangle};
+use crate::structs::RenderContext;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
 mod compute_pipeline;
@@ -104,75 +102,77 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     ///////////////////////////////////////////////////////////
 
-    let default_uniform = ComputeUniform {
-        test: [0.3, 0.2, 0.9, 1.0],
-        ..Default::default()
-    };
+    // let default_uniform = ComputeUniform {
+    //     test: [0.3, 0.2, 0.9, 1.0],
+    //     ..Default::default()
+    // };
 
-    let test_triangles_list = vec![
-        Triangle {
-            p0: [0.0, 0.0, 0.0, 0.0],
-            p1: [0.5, 0.0, 0.0, 0.0],
-            p2: [0.5, 0.5, 0.0, 0.0],
-        },
-        Triangle {
-            p0: [0.0, 0.5, 0.0, 0.0],
-            p1: [0.5, 0.5, 0.0, 0.0],
-            p2: [0.5, 1.0, 0.0, 0.0],
-        },
-        Triangle {
-            p0: [0.0, -0.5, 0.0, 0.0],
-            p1: [-0.5, -0.5, 0.0, 0.0],
-            p2: [-0.5, -1.0, 0.0, 0.0],
-        },
-    ];
+    // let test_triangles_list = vec![
+    //     Triangle {
+    //         p0: [0.0, 0.0, 0.0, 0.0],
+    //         p1: [0.5, 0.0, 0.0, 0.0],
+    //         p2: [0.5, 0.5, 0.0, 0.0],
+    //     },
+    //     Triangle {
+    //         p0: [0.0, 0.5, 0.0, 0.0],
+    //         p1: [0.5, 0.5, 0.0, 0.0],
+    //         p2: [0.5, 1.0, 0.0, 0.0],
+    //     },
+    //     Triangle {
+    //         p0: [0.0, -0.5, 0.0, 0.0],
+    //         p1: [-0.5, -0.5, 0.0, 0.0],
+    //         p2: [-0.5, -1.0, 0.0, 0.0],
+    //     },
+    // ];
+    //
+    // let triangle_buffer = app.device.create_buffer_init(&BufferInitDescriptor {
+    //     label: Some("[Compute Uniform] Buffer"),
+    //     contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
+    //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+    // });
 
-    let triangle_buffer = app.device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("[Compute Uniform] Buffer"),
-        contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
-        usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-    });
-
-    println!("=========================");
-    let triangle_buffer_binding = BindingGeneratorBuilder::new(&app.device)
-        .with_default_buffer_storage(ShaderStages::COMPUTE, &triangle_buffer, true)
-        .done()
-        .build();
-    println!("=========================");
+    // println!("=========================");
+    // let triangle_buffer_binding = BindingGeneratorBuilder::new(&app.device)
+    //     .with_default_buffer_storage(ShaderStages::COMPUTE, &triangle_buffer, true)
+    //     .done()
+    //     .build();
+    // println!("=========================");
 
     // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
 
-    println!("{:?}", default_uniform.view_proj);
+    // println!("{:?}", default_uniform.view_proj);
 
     // let tray_stor_buffer = ComputeContext::buffers_init(&app.device);
 
-    let tray_uni_buffer = ComputeContext::uniform_init(&app.device, default_uniform);
+    // let tray_uni_buffer = TracingPipeline::uniform_init(&app.device, default_uniform);
 
-    let (tray_uni_layout, tray_uni_group) =
-        ComputeContext::uniform_create_binds(&app.device, &tray_uni_buffer);
+    // let (tray_uni_layout, tray_uni_group) =
+    //     TracingPipeline::uniform_create_binds(&app.device, &tray_uni_buffer);
 
-    let render_texture_bind_groups =
-        init_tracing_binding_render_texture(&app.device, &diffuse_texture_view);
+    // let render_texture_bind_groups =
+    //     init_tracing_binding_render_texture(&app.device, &diffuse_texture_view);
 
-    let tracing_pipeline = init_tracing_pipeline(
-        &app.device,
-        &[
-            &render_texture_bind_groups.bind_group_layout,
-            &tray_uni_layout,
-            &triangle_buffer_binding.bind_group_layout,
-        ],
-    );
+    // let tracing_pipeline = TracingPipeline::init_pipeline(
+    //     &app.device,
+    //     &[
+    //         &render_texture_bind_groups.bind_group_layout,
+    //         &tray_uni_layout,
+    //         &triangle_buffer_binding.bind_group_layout,
+    //     ],
+    // );
 
-    let pipeline_tracing = ComputeContext {
-        pipeline: tracing_pipeline,
-        bind_group: render_texture_bind_groups.bind_group,
-        bind_group_layout: render_texture_bind_groups.bind_group_layout,
-        uniform: default_uniform,
-        uniform_buffer: tray_uni_buffer,
-        uniform_bind_group: tray_uni_group,
-    };
+    // let pipeline_tracing = TracingPipeline {
+    //     pipeline: tracing_pipeline,
+    //     bind_group: render_texture_bind_groups.bind_group,
+    //     bind_group_layout: render_texture_bind_groups.bind_group_layout,
+    //     uniform: default_uniform,
+    //     uniform_buffer: tray_uni_buffer,
+    //     uniform_bind_group: tray_uni_group,
+    // };
 
     // pipeline_tracing.uniform_update(&app.queue);
+
+    let tracing_pipeline = TracingPipeline::new(&app.device, &diffuse_texture_view);
 
     ///////////////////////////////////////////////////////////
 
@@ -191,7 +191,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             push_constant_ranges: &[],
         });
 
-    let render_pipeline = app
+    let ren_pipeline = app
         .device
         .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
@@ -214,15 +214,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     app.surface.configure(&app.device, &app.config);
 
-    let pipeline_render = RenderContext {
-        pipeline: render_pipeline,
+    let render_pipeline = RenderContext {
+        pipeline: ren_pipeline,
         layout: pipeline_layout,
     };
 
-    let pipelines = Pipelines {
-        render: pipeline_render,
-        tracing: pipeline_tracing,
-    };
+    // let pipelines = Pipelines {
+    //     render: pipeline_render,
+    //     tracing: tracing_pipeline,
+    // };
 
     // init_tracing_pipeline_layout(&app.device);
 
@@ -263,10 +263,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     let mut compute_pass =
                         encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
 
-                    compute_pass.set_pipeline(&pipelines.tracing.pipeline);
-                    compute_pass.set_bind_group(0, &pipelines.tracing.bind_group, &[]);
-                    compute_pass.set_bind_group(1, &pipelines.tracing.uniform_bind_group, &[]);
-                    compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
+                    compute_pass.set_pipeline(&tracing_pipeline.pipeline);
+                    compute_pass.set_bind_group(
+                        0,
+                        &tracing_pipeline.render_texture_binds.bind_group,
+                        &[],
+                    );
+                    compute_pass.set_bind_group(1, &tracing_pipeline.storage_binds.bind_group, &[]);
+                    // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
                     compute_pass.dispatch_workgroups(1920, 1080, 1);
                 }
 
@@ -284,7 +288,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         depth_stencil_attachment: None,
                     });
                     rpass.set_bind_group(0, &render_texture_bindgroups.bind_group, &[]); // NEW!
-                    rpass.set_pipeline(&pipelines.render.pipeline);
+                    rpass.set_pipeline(&render_pipeline.pipeline);
                     rpass.draw(0..3, 0..1);
                 }
 

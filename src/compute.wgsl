@@ -12,10 +12,10 @@ struct Triangle {
 @group(0) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
 
-@group(1) @binding(0)
-var<uniform> unidata: ComputeUniform;
+//@group(1) @binding(0)
+//var<uniform> unidata: ComputeUniform;
 
-@group(2) @binding(0)
+@group(1) @binding(0)
 var<storage> triangles: array<Triangle>;
 
 fn intersect_triangle(
@@ -104,5 +104,5 @@ fn main(
 //        final_color = vec4(0.6, 0.6, 0.3, 1.0);
 //    }
 
-    textureStore(color_output, screen_pos, unidata.test * final_color);
+    textureStore(color_output, screen_pos, final_color);
 }

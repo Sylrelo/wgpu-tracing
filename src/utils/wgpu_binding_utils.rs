@@ -141,9 +141,6 @@ impl<'a> BindingGeneratorBuilder<'a> {
             BindingType::Texture { .. } => self.context.binding_type,
             BindingType::StorageTexture { .. } => self.context.binding_type,
             // _ => self.context.binding_type,
-            _ => {
-                panic!("Binding type not handled.");
-            }
         };
 
         self.create_entries();
