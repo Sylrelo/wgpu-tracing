@@ -8,14 +8,8 @@ winit = "0.28.7"
 wgpu = "0.17.0"
 env_logger = "0.10.0"
 pollster = "0.3.0"
-#glam = "0.24.1"
 cgmath = "0.18.0"
-
-[dependencies.image]
-version = "0.24.7"
-default-features = false
-features = ["jpeg"]
-
-[dependencies.bytemuck]
-features = ['derive']
-version = "1.14.0"
+notify = "6.1.1"
+image = { version = "0.24.7", default-features = false, features = ["jpeg"] }
+bytemuck = { version = "1.14.0", features = ["derive"] }
+naga = "0.13.0"

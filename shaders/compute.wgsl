@@ -81,7 +81,7 @@ fn main(
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0) - ray_origin);
 
     var total_dist = 0.0;
-    var final_color = vec4<f32>(0.1, 0.1, 0.0, 1.0);
+    var final_color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
     let tot = i32(arrayLength(&triangles));
     var t_dst = 100000;
@@ -97,12 +97,15 @@ fn main(
         );
 
         if (t > 0.0) {
-            final_color = vec4(0.6, 0.6, 0.3, 1.0);
+            final_color = vec4(0.5, 0.2, 0.0, 1.0);
         }
     }
+
+
 //    if (intersect_triangle(ray_origin, ray_direction, vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0)) > 0.0) {
 //        final_color = vec4(0.6, 0.6, 0.3, 1.0);
 //    }
 
+    // test cacahuzete
     textureStore(color_output, screen_pos, final_color);
 }
