@@ -1,21 +1,22 @@
-use std::{thread, time};
+use naga::valid::{Capabilities, ValidationFlags};
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::Read;
-use std::ops::Sub;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{thread, time};
 
+use log::{error, info};
 use notify::{RecursiveMode, Watcher};
 use wgpu::{Device, Label, ShaderModule, TextureFormat};
+use winit::dpi::{PhysicalSize, Size};
+use winit::window::WindowBuilder;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use winit::dpi::{PhysicalSize, Size};
-use winit::window::WindowBuilder;
 
 use structs::{App, SwapchainData};
 
@@ -24,10 +25,10 @@ use crate::structs::RenderContext;
 use crate::tracing_pipeline::TracingPipeline;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
-mod tracing_pipeline;
 mod init_render_pipeline;
 mod init_wgpu;
 mod structs;
+mod tracing_pipeline;
 mod utils;
 
 impl App {
@@ -52,25 +53,34 @@ impl App {
 fn compile_shader(device: &Device) -> Option<ShaderModule> {
     let file = File::open("shaders/compute.wgsl");
     let mut buff: String = String::new();
-    file.unwrap().read_to_string(&mut buff).expect("TODO: panic message");
+    file.unwrap()
+        .read_to_string(&mut buff)
+        .expect("TODO: panic message");
 
-    let shader = naga::front::wgsl::parse_str(&*buff);
+    let shader = naga::front::wgsl::parse_str(&buff);
 
-    if shader.is_err() {
-        println!("Shader compile error : {}", shader.err().unwrap());
-        return None;
-    }
+    return if let Ok(shader) = shader {
+        let validator =
+            naga::valid::Validator::new(ValidationFlags::all(), Capabilities::default())
+                .validate(&shader);
 
-    let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Label::from("Reloaded Shader"),
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*buff)),
-    });
+        if validator.is_err() {
+            error!(target: "compile_shader", "{}", validator.err().unwrap());
+            return None;
+        }
 
-    return Some(shader_module);
+        Some(device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Label::from("Reloaded Shader"),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*buff)),
+        }))
+    } else {
+        error!(target: "compile_shader", "{}", shader.err().unwrap());
+        None
+    };
 }
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
-    let mut app = App::new(window).await;
+    let app = App::new(window).await;
 
     // TEX TEST
     let diffuse_bytes = include_bytes!("teddy.jpg");
@@ -138,7 +148,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // pipeline_tracing.uniform_update(&app.queue);
     ///////////////////////////////////////////////////////////
 
-    let mut tracing_pipeline = TracingPipeline::new(&app.device, &diffuse_texture_view);
+    let tracing_pipeline = TracingPipeline::new(&app.device, &diffuse_texture_view);
 
     //////////
 
@@ -189,68 +199,65 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         layout: pipeline_layout,
     };
 
-    // let pipelines = Pipelines {
-    //     render: pipeline_render,
-    //     tracing: tracing_pipeline,
-    // };
-
-    // init_tracing_pipeline_layout(&app.device);
-
-    let mut last_modified = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-
-    println!(" == >> {:?}", last_modified);
+    let mut last_modified = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
 
     app.window.set_visible(true);
 
-
-    let apparc = Arc::new(Mutex::new(app));
-
-    let app0 = apparc.clone();
-
+    let app_arc = Arc::new(Mutex::new(app));
 
     let tracing_pipeline_arc = Arc::new(Mutex::new(tracing_pipeline));
 
-    let mut wow = tracing_pipeline_arc.clone();
-    let mut watcher = notify::recommended_watcher(move |res| {
-        match res {
-            Ok(event) => {
-                let ev = event as notify::event::Event;
-
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-
-
-                if now - last_modified >= 1 && ev.kind.is_modify() {
-                    thread::sleep(time::Duration::from_millis(5));
-
-                    let shader_module = compile_shader(&app0.lock().unwrap().device);
-
-                    match shader_module {
-                        Some(shader_module) => {
-                            println!("re-create pipeline");
-                            wow.lock().unwrap().recreate_pipeline(&app0.lock().unwrap().device, shader_module);
-                            app0.lock().unwrap().window.request_redraw();
-                        }
-
-                        _ => {}
-                    }
-
-                    println!("event: {:?} {:?}", SystemTime::now(), ev);
-                    last_modified = now;
-                }
-            }
-            Err(e) => println!("watch error: {:?}", e),
-        }
-    }).unwrap();
-
-    watcher.watch(Path::new("shaders/"), RecursiveMode::NonRecursive).expect("TODO: panic message");
-
-
-    let app2 = apparc.clone();
     let tracing_pipeline = tracing_pipeline_arc.clone();
+    let app = app_arc.clone();
+    let mut watcher = notify::recommended_watcher(move |res| match res {
+        Ok(event) => {
+            let ev = event as notify::event::Event;
+
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            if now - last_modified >= 1 && ev.kind.is_modify() {
+                thread::sleep(time::Duration::from_millis(50));
+
+                let shader_module = compile_shader(&app.lock().unwrap().device);
+                if let Some(shader_module) = shader_module {
+                    tracing_pipeline
+                        .lock()
+                        .unwrap()
+                        .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+                    app.lock().unwrap().window.request_redraw();
+                    info!("Shader reloaded !");
+                }
+
+                last_modified = now;
+            }
+        }
+        Err(e) => println!("watch error: {:?}", e),
+    })
+    .unwrap();
+
+    watcher
+        .watch(Path::new("shaders/"), RecursiveMode::NonRecursive)
+        .expect("TODO: panic message");
+
+    let app = app_arc.clone();
+    let tracing_pipeline = tracing_pipeline_arc.clone();
+
+    // let mut fps = 0;
+    // let mut last_time = SystemTime::now()
+    //     .duration_since(UNIX_EPOCH)
+    //     .unwrap()
+    //     .as_secs();
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
-        let mut app = app2.lock().unwrap();
+        let mut app = app.lock().unwrap();
         let tracing_pipeline = tracing_pipeline.lock().unwrap();
         match event {
             Event::WindowEvent {
@@ -264,6 +271,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // On macos the window needs to be redrawn manually after resizing
                 app.window.request_redraw();
             }
+
+            // Event::MainEventsCleared => {
+            //     let curr = SystemTime::now()
+            //         .duration_since(UNIX_EPOCH)
+            //         .unwrap()
+            //         .as_secs();
+            //     fps += 1;
+            //
+            //     if curr - last_time >= 1 {
+            //         println!("FPS: {}", fps);
+            //         fps = 0;
+            //         last_time = curr;
+            //     }
+            //     // println!("Done !");
+            //     app.window.request_redraw();
+            // }
             Event::RedrawRequested(_) => {
                 let frame = app
                     .surface
@@ -274,7 +297,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                println!("Redraw");
                 let mut encoder = app
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -313,6 +335,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 }
 
 fn main() {
+    env_logger::init();
+
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_visible(false)
@@ -320,25 +344,5 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env_logger::init();
-        pollster::block_on(run(event_loop, window));
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("could not initialize logger");
-        use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(window.canvas()))
-                    .ok()
-            })
-            .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, window));
-    }
+    pollster::block_on(run(event_loop, window));
 }
