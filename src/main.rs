@@ -1,23 +1,23 @@
-use naga::valid::{Capabilities, ValidationFlags};
+use std::{thread, time};
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{thread, time};
 
-use log::{error, info};
+use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
 use wgpu::{Device, Label, ShaderModule, TextureFormat};
-use winit::dpi::{PhysicalSize, Size};
-use winit::window::WindowBuilder;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+use winit::dpi::{PhysicalSize, Size};
+use winit::window::WindowBuilder;
 
+use log::{error, info};
 use structs::{App, SwapchainData};
 
 use crate::init_wgpu::InitWgpu;
@@ -37,6 +37,7 @@ impl App {
         let (adapter, device, queue) = InitWgpu::get_device_and_queue(&instance, &surface).await;
         let swapchain_config = InitWgpu::get_swapchain_config(&surface, &adapter);
         let config = InitWgpu::init_config(&swapchain_config, &window.inner_size());
+
 
         App {
             size: window.inner_size(),
@@ -239,7 +240,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         }
         Err(e) => println!("watch error: {:?}", e),
     })
-    .unwrap();
+        .unwrap();
 
     watcher
         .watch(Path::new("shaders/"), RecursiveMode::NonRecursive)
@@ -248,14 +249,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = app_arc.clone();
     let tracing_pipeline = tracing_pipeline_arc.clone();
 
-    // let mut fps = 0;
-    // let mut last_time = SystemTime::now()
-    //     .duration_since(UNIX_EPOCH)
-    //     .unwrap()
-    //     .as_secs();
+    let mut fps = 0;
+    let mut last_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::Poll;
 
         let mut app = app.lock().unwrap();
         let tracing_pipeline = tracing_pipeline.lock().unwrap();
@@ -272,21 +273,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.window.request_redraw();
             }
 
-            // Event::MainEventsCleared => {
-            //     let curr = SystemTime::now()
-            //         .duration_since(UNIX_EPOCH)
-            //         .unwrap()
-            //         .as_secs();
-            //     fps += 1;
-            //
-            //     if curr - last_time >= 1 {
-            //         println!("FPS: {}", fps);
-            //         fps = 0;
-            //         last_time = curr;
-            //     }
-            //     // println!("Done !");
-            //     app.window.request_redraw();
-            // }
+            Event::MainEventsCleared => {
+                let curr = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                fps += 1;
+
+                if curr - last_time >= 1 {
+                    println!("FPS: {}", fps);
+                    fps = 0;
+                    last_time = curr;
+                }
+                // println!("Done !");
+                app.window.request_redraw();
+            }
+
             Event::RedrawRequested(_) => {
                 let frame = app
                     .surface
@@ -322,6 +324,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 }
 
                 app.queue.submit(Some(encoder.finish()));
+
                 frame.present();
             }
 

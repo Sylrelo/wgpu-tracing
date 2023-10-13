@@ -25,6 +25,20 @@ fn intersect_triangle(
     p1: vec3<f32>,
     p2: vec3<f32>) -> f32
 {
+
+//
+//      let e1 = p0 - p2;
+//      let e2 = p1 - p2;
+//
+//      let t = o - v2;
+//      let p = cross(d, e2);
+//      let q = cross(t, e1);
+//      let a = vec3(dot(q,e2), dot(p,t), dot(q,d)) / dot(p,e1);
+//
+//      return a;
+//      return vec4(a, 1.0 - a.y - a.z);
+
+
     let edge0 = p1 - p0;
     let edge1 = p2 - p0;
 
@@ -59,7 +73,7 @@ fn intersect_triangle(
 }
 
 struct TriangleHit {
-    tri: Triangle,
+    tri: i32,
     has_hit: bool,
 }
 
@@ -88,7 +102,7 @@ fn get_closest_triangle(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> Tria
         }
     }
 
-    return TriangleHit(triangles[index], has_hit);
+    return TriangleHit(index, has_hit);
 }
 
 @compute
@@ -110,7 +124,7 @@ fn main(
         1.0 - 2.0 * f32(ndc_pixel.y) * tatan
     );
 
-    let ray_origin = vec3(0.0, 0.0, 1.5);
+    let ray_origin = vec3(0.0, 0.0, 7.5);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
 
     var final_color = vec4<f32>(0.025, 0.025, 0.025, 1.0);

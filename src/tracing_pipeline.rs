@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use rand::Rng;
 use wgpu::{BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages, TextureView};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
@@ -108,7 +109,7 @@ impl TracingPipeline {
     }
 
     fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> Buffer {
-        let test_triangles_list = vec![
+        let mut test_triangles_list = vec![
             Triangle {
                 p0: [0.0, 0.0, 0.0, 0.0],
                 p1: [0.5, 0.0, 0.0, 0.0],
@@ -125,6 +126,19 @@ impl TracingPipeline {
                 p2: [-0.5, -1.0, 0.0, 0.0],
             },
         ];
+
+        for _i in 0..100 {
+            let mut rng = rand::thread_rng();
+            let pt = (1000 - rng.gen_range(0..2000)) as f32 * 0.005;
+            let pt2 = (1000 - rng.gen_range(0..2000)) as f32 * 0.005;
+            let pt3 = (1000 - rng.gen_range(0..2000)) as f32 * 0.003;
+
+            test_triangles_list.push(Triangle {
+                p0: [0.0 + pt, 0.0 + pt2, pt3, 0.0],
+                p1: [0.5 + pt, 0.0 + pt2, pt3, 0.0],
+                p2: [0.5 + pt, 0.5 + pt2, pt3, 0.0],
+            });
+        }
 
         device.create_buffer_init(&BufferInitDescriptor {
             label: Some("[Compute Uniform] Buffer"),
