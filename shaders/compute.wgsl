@@ -105,8 +105,55 @@ fn get_closest_triangle(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> Tria
     return TriangleHit(index, has_hit);
 }
 
+fn sdf_box(ray: vec3<f32>, b: vec3<f32>) -> f32
+{
+      var q = abs(ray) - b;
+      return length(max(q, vec3<f32>(0.0, 0.0, 0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+fn get_closest_triangle_raymarching(ray: vec3<f32>) -> f32
+{
+    var dist = 1000000.0;
+    var has_hit = false;
+    let tot = i32(arrayLength(&triangles));
+
+    for (var i = 0; i < tot; i++)
+    {
+//        let current_triangle = triangles[i];
+        let t = sdf_box(ray  + (triangles[i].p2.xyz * 2.5), vec3<f32>(0.5, 0.5, 0.5));
+
+        if (t < dist) {
+            dist = t;
+        }
+    }
+
+    return dist;
+}
+
+fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> f32
+{
+    var total_traveled_distance = 0.0;
+
+    for (var i = 0; i < 256; i++) {
+        var current_position = ray_origin + total_traveled_distance * ray_direction;
+        var closest = get_closest_triangle_raymarching(current_position);
+
+        if (closest < 0.01) {
+            return 1.0;
+        }
+
+        if (total_traveled_distance > 100.0) {
+            break ;
+        }
+
+        total_traveled_distance += closest;
+    }
+
+    return 0.0;
+}
+
 @compute
-@workgroup_size(1)
+@workgroup_size(16, 8)
 fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>,
 ) {
@@ -124,15 +171,19 @@ fn main(
         1.0 - 2.0 * f32(ndc_pixel.y) * tatan
     );
 
-    let ray_origin = vec3(0.0, 0.0, 7.5);
+    let ray_origin = vec3(0.0, 0.0, 13.5);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
 
     var final_color = vec4<f32>(0.025, 0.025, 0.025, 1.0);
 
-    let hit = get_closest_triangle(ray_origin, ray_direction);
+//    let dist = raymarch(ray_origin, ray_direction);;
+//    if (dist > 0.0) {
+//        final_color = vec4(0.1, 0.3, 0.6, 1.0);
+//    }
 
+    let hit = get_closest_triangle(ray_origin, ray_direction);
     if (hit.has_hit == true) {
-        final_color = vec4(0.1, 0.3, 0.6, 1.0);
+        final_color = vec4(0.1, 0.6, 0.6, 1.0);
     }
 
     textureStore(color_output, screen_pos, final_color);

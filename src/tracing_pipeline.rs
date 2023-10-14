@@ -50,7 +50,7 @@ impl TracingPipeline {
         compute_pass.set_bind_group(0, &self.render_texture_binds.bind_group, &[]);
         compute_pass.set_bind_group(1, &self.storage_binds.bind_group, &[]);
         // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
-        compute_pass.dispatch_workgroups(1920, 1080, 1);
+        compute_pass.dispatch_workgroups(120, 135, 1);
     }
 
 
