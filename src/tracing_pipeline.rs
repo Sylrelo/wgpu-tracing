@@ -146,7 +146,7 @@ impl TracingPipeline {
 
         let mut test_voxels_list: Vec<Voxel> = Vec::new();
 
-        for _i in 0..500 {
+        for _i in 0..300 {
             let mut rng = rand::thread_rng();
             let pt = (1000 - rng.gen_range(0..2000)) as f32 * 0.01;
             let pt2 = (1000 - rng.gen_range(0..2000)) as f32 * 0.01;
@@ -158,11 +158,11 @@ impl TracingPipeline {
                 pos: [pt, pt2, pt3, 2.0],
             });
 
-            test_triangles_list.push(Triangle {
-                p0: [0.0 + pt, 0.0 + pt2, pt3, 0.0],
-                p1: [0.5 + pt, 0.0 + pt2, pt3, 0.0],
-                p2: [0.5 + pt, 0.5 + pt2, pt3, 0.0],
-            });
+            // test_triangles_list.push(Triangle {
+            //     p0: [0.0 + pt, 0.0 + pt2, pt3, 0.0],
+            //     p1: [0.5 + pt, 0.0 + pt2, pt3, 0.0],
+            //     p2: [0.5 + pt, 0.5 + pt2, pt3, 0.0],
+            // });
         }
         for x in 0..30 {
             for z in 0..30 {

@@ -80,7 +80,7 @@ fn normal_cube(
     min: vec3<f32>,
     max: vec3<f32>
 ) -> vec3<f32> {
-    let epsilon = 0.01;
+    let epsilon = 0.000001;
 
     let bmin = min - pos;
     let bmax = max - pos;
@@ -157,7 +157,7 @@ fn intersect_triangle(
 
     let t = f * dot(edge1, q);
 
-    if t > 0.00001 {
+    if t > 0.001 {
         return t;
     }
     return 0.0;
