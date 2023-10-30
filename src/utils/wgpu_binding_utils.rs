@@ -178,9 +178,6 @@ impl<'a> BindingGeneratorBuilder<'a> {
             binding: index as u32,
             resource: self.context.binding_resource.clone().unwrap(),
         });
-
-        println!("{:?}", self.group_layout_entries);
-        println!("{:?}", self.group_entries);
     }
 
     fn generate_bindings(&self) -> BindGroups {

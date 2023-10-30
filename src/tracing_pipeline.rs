@@ -155,7 +155,7 @@ impl TracingPipeline {
             test_voxels_list.push(Voxel {
                 min: [-0.5, -0.5, -0.5, 0.0],
                 max: [0.5, 0.5, 0.5, 0.0],
-                pos: [pt, pt2, pt3, 0.0],
+                pos: [pt, pt2, pt3, 2.0],
             });
 
             test_triangles_list.push(Triangle {
@@ -163,6 +163,15 @@ impl TracingPipeline {
                 p1: [0.5 + pt, 0.0 + pt2, pt3, 0.0],
                 p2: [0.5 + pt, 0.5 + pt2, pt3, 0.0],
             });
+        }
+        for x in 0..30 {
+            for z in 0..30 {
+                test_voxels_list.push(Voxel {
+                    min: [-0.5, -0.5, -0.5, 0.0],
+                    max: [0.5, 0.5, 0.5, 0.0],
+                    pos: [15.0 - x as f32, 3.0, 15.0 - z as f32, 0.0],
+                });
+            }
         }
 
         let triangle_buffer = device.create_buffer_init(&BufferInitDescriptor {
