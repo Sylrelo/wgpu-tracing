@@ -1,27 +1,27 @@
-use std::{thread, time};
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{thread, time};
 
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
 use wgpu::{Device, Label, ShaderModule, TextureFormat};
+use winit::dpi::{PhysicalSize, Size};
+use winit::window::WindowBuilder;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use winit::dpi::{PhysicalSize, Size};
-use winit::window::WindowBuilder;
 
 use log::{error, info};
 use structs::{App, SwapchainData};
 
 use crate::init_wgpu::InitWgpu;
-use crate::structs::RenderContext;
+use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline::TracingPipeline;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
@@ -37,7 +37,6 @@ impl App {
         let (adapter, device, queue) = InitWgpu::get_device_and_queue(&instance, &surface).await;
         let swapchain_config = InitWgpu::get_swapchain_config(&surface, &adapter);
         let config = InitWgpu::init_config(&swapchain_config, &window.inner_size());
-
 
         App {
             size: window.inner_size(),
@@ -86,14 +85,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // TEX TEST
     let diffuse_bytes = include_bytes!("teddy.jpg");
     let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
-    let diffuse_rgba = diffuse_image.to_rgba8();
+    // let diffuse_rgba = diffuse_image.to_rgba8();
 
     use image::GenericImageView;
-    let dimensions = diffuse_image.dimensions();
+    // let dimensions = diffuse_image.dimensions();
 
     let texture_size = wgpu::Extent3d {
-        width: 1920,
-        height: 1080,
+        width: INTERNAL_W,
+        height: INTERNAL_H,
         depth_or_array_layers: 1,
     };
 
@@ -109,21 +108,21 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: Some("diffuse_texture"),
         view_formats: &[],
     });
-    app.queue.write_texture(
-        wgpu::ImageCopyTexture {
-            texture: &diffuse_texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        &diffuse_rgba,
-        wgpu::ImageDataLayout {
-            offset: 0,
-            bytes_per_row: Some(4 * dimensions.0),
-            rows_per_image: Some(dimensions.1),
-        },
-        texture_size,
-    );
+    // app.queue.write_texture(
+    //     wgpu::ImageCopyTexture {
+    //         texture: &diffuse_texture,
+    //         mip_level: 0,
+    //         origin: wgpu::Origin3d::ZERO,
+    //         aspect: wgpu::TextureAspect::All,
+    //     },
+    //     &diffuse_rgba,
+    //     wgpu::ImageDataLayout {
+    //         offset: 0,
+    //         bytes_per_row: Some(4 * dimensions.0),
+    //         rows_per_image: Some(dimensions.1),
+    //     },
+    //     texture_size,
+    // );
     let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
     let diffuse_sampler = app.device.create_sampler(&wgpu::SamplerDescriptor {
         address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -240,7 +239,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         }
         Err(e) => println!("watch error: {:?}", e),
     })
-        .unwrap();
+    .unwrap();
 
     watcher
         .watch(Path::new("shaders/"), RecursiveMode::NonRecursive)
@@ -340,10 +339,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 fn main() {
     env_logger::init();
 
+    println!("Internal resolution : {} x {}", INTERNAL_W, INTERNAL_H);
+
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_visible(false)
-        .with_inner_size(Size::from(PhysicalSize::new(1280, 720)))
+        .with_inner_size(Size::from(PhysicalSize::new(1920, 1080)))
         .build(&event_loop)
         .unwrap();
 

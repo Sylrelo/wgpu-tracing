@@ -1,10 +1,14 @@
 use std::borrow::Cow;
 
 use rand::Rng;
-use wgpu::{BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages, TextureView};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::{
+    BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
+    ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages,
+    TextureView,
+};
 
-use crate::structs::Triangle;
+use crate::structs::{Triangle, Voxel, INTERNAL_H, INTERNAL_W};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
 pub struct TracingPipeline {
@@ -16,12 +20,23 @@ pub struct TracingPipeline {
 
     // pub uniform_buffer: Buffer,
     pub triangles_buffer: Buffer,
+
+    pub voxels_buffer: Buffer,
 }
 
 impl TracingPipeline {
     pub fn new(device: &Device, render_texture: &TextureView) -> TracingPipeline {
-        let triangles_buffer = Self::create_triangle_buffer_tmp_todo_remove(device);
-        let storage_binds = Self::init_bind_storage(device, &triangles_buffer);
+        let (triangles_buffer, voxels_buffer) =
+            Self::create_triangle_buffer_tmp_todo_remove(device);
+
+        // let storage_binds = Self::init_bind_storage(device, &triangles_buffer);
+
+        let storage_binds = BindingGeneratorBuilder::new(device)
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &triangles_buffer, true)
+            .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &voxels_buffer, true)
+            .done()
+            .build();
 
         let render_texture_binds = Self::init_bind_render_texture(device, render_texture);
 
@@ -40,6 +55,7 @@ impl TracingPipeline {
             storage_binds,
             // uniform_buffer: (),
             triangles_buffer,
+            voxels_buffer,
         }
     }
 
@@ -50,9 +66,8 @@ impl TracingPipeline {
         compute_pass.set_bind_group(0, &self.render_texture_binds.bind_group, &[]);
         compute_pass.set_bind_group(1, &self.storage_binds.bind_group, &[]);
         // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
-        compute_pass.dispatch_workgroups(120, 135, 1);
+        compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 9, 1);
     }
-
 
     //TODO: Somehow merge or half-merge init_pipeline and recreate_pipeline
     pub fn recreate_pipeline(&mut self, device: &Device, shader_module: ShaderModule) {
@@ -76,7 +91,9 @@ impl TracingPipeline {
     fn init_pipeline(device: &Device, bind_group_layouts: &[&BindGroupLayout]) -> ComputePipeline {
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Label::from("Tracing Shader"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("../shaders/compute.wgsl"))),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
+                "../shaders/compute.wgsl"
+            ))),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -108,7 +125,7 @@ impl TracingPipeline {
             .build()
     }
 
-    fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> Buffer {
+    fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> (Buffer, Buffer) {
         let mut test_triangles_list = vec![
             Triangle {
                 p0: [0.0, 0.0, 0.0, 0.0],
@@ -127,11 +144,19 @@ impl TracingPipeline {
             },
         ];
 
-        for _i in 0..100 {
+        let mut test_voxels_list: Vec<Voxel> = Vec::new();
+
+        for _i in 0..500 {
             let mut rng = rand::thread_rng();
-            let pt = (1000 - rng.gen_range(0..2000)) as f32 * 0.005;
-            let pt2 = (1000 - rng.gen_range(0..2000)) as f32 * 0.005;
-            let pt3 = (1000 - rng.gen_range(0..2000)) as f32 * 0.003;
+            let pt = (1000 - rng.gen_range(0..2000)) as f32 * 0.01;
+            let pt2 = (1000 - rng.gen_range(0..2000)) as f32 * 0.01;
+            let pt3 = (1000 - rng.gen_range(0..2000)) as f32 * 0.008;
+
+            test_voxels_list.push(Voxel {
+                min: [-0.5, -0.5, -0.5, 0.0],
+                max: [0.5, 0.5, 0.5, 0.0],
+                pos: [pt, pt2, pt3, 0.0],
+            });
 
             test_triangles_list.push(Triangle {
                 p0: [0.0 + pt, 0.0 + pt2, pt3, 0.0],
@@ -140,11 +165,19 @@ impl TracingPipeline {
             });
         }
 
-        device.create_buffer_init(&BufferInitDescriptor {
+        let triangle_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("[Compute Uniform] Buffer"),
             contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        })
+        });
+
+        let voxel_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("[Compute Uniform] Buffer Voxels"),
+            contents: bytemuck::cast_slice(test_voxels_list.as_slice()),
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
+
+        return (triangle_buffer, voxel_buffer);
     }
 
     // pub fn uniform_init(device: &Device, uniform: ComputeUniform) -> Buffer {
