@@ -178,6 +178,50 @@ fn intersect_triangle(
     return 0.0;
 }
 
+fn traverse_bvh(ray: Ray) -> TriangleHit {
+    var hit: TriangleHit = TriangleHit(0, false, 0.0);
+    var current_index = 0u;
+
+    while true {
+        if current_index >= arrayLength(&bvh) - 1u {
+            break;
+        }
+
+        let node = bvh[current_index];
+
+        if node.entry_index == 4294967295u {
+            let current_voxel = voxels[node.shape_index];
+            let t = intersect_cube(
+                ray,
+                current_voxel.min.xyz,
+                current_voxel.max.xyz,
+                current_voxel.pos.xyz
+            );
+
+            if t > 0.0 {
+                hit.has_hit = true;
+                hit.t = t;
+                break;
+            } else {
+                current_index = node.exit_index;
+                continue;
+            }
+        }
+        let aabb_test_t = intersect_cube(
+            ray,
+            node.aabb_min.xyz,
+            node.aabb_max.xyz,
+            vec3(0.0, 0.0, 0.0),
+        );
+
+        if aabb_test_t > 0.0 {
+            current_index = node.entry_index;
+        } else {
+            current_index = node.exit_index;
+        }
+    }
+    return hit;
+}
 
 fn get_closest(ray: Ray) -> TriangleHit {
     var dist = 1000000.0;
@@ -321,7 +365,8 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
     var ray = ray_in;
 
     for (var i = 0; i < 4; i++) {
-        let hit = get_closest(ray);
+        let hit = traverse_bvh(ray);
+        // let hit = get_closest(ray);
 
         if hit.has_hit == false {
             color += vec3(1.00, 1.00, 1.00) * throughput;
