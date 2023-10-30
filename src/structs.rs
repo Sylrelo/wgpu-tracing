@@ -54,6 +54,37 @@ pub struct Voxel {
     pub min: [f32; 4],
     pub max: [f32; 4],
     pub pos: [f32; 4],
+    pub node_index: usize,
+    pub _padding: usize,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct BvhNodeGpu {
+    pub aabb_min: [f32; 4],
+    pub aabb_max: [f32; 4],
+    pub entry_index: u32,
+    pub exit_index: u32,
+    pub shape_index: u32,
+    pub _padding: u32,
+}
+
+impl BvhNodeGpu {
+    pub fn new(
+        aabb: &bvh::aabb::AABB,
+        entry_index: u32,
+        exit_index: u32,
+        shape_index: u32,
+    ) -> BvhNodeGpu {
+        BvhNodeGpu {
+            aabb_min: [aabb.min.x, aabb.min.y, aabb.min.z, 0.0],
+            aabb_max: [aabb.max.x, aabb.max.y, aabb.max.z, 0.0],
+            entry_index,
+            exit_index,
+            shape_index,
+            _padding: 0,
+        }
+    }
 }
 
 // #[repr(C)]

@@ -13,7 +13,19 @@ struct Voxel {
     min: vec4<f32>,
     max: vec4<f32>,
     pos: vec4<f32>,
+    node_index: u32,
+    _padding: u32,
 }
+
+struct BvhNodeGpu {
+    aabb_min: vec4<f32>,
+    aabb_max: vec4<f32>,
+    entry_index: u32,
+    exit_index: u32,
+    shape_index: u32,
+    _padding: u32,
+}
+
 
 struct TriangleHit {
     tri: i32,
@@ -38,6 +50,9 @@ var<storage> triangles: array<Triangle>;
 
 @group(1) @binding(1)
 var<storage> voxels: array<Voxel>;
+
+@group(1) @binding(2)
+var<storage> bvh: array<BvhNodeGpu>;
 
 
 fn intersect_cube(
@@ -240,7 +255,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> f32 {
     return 0.0;
 }
 
-const MAX_SAMPLES = 4;
+const MAX_SAMPLES = 2;
 // var<storage> seed: vec2<f32> = vec2<f32>(0.0, 0.0);
 
 const M_PI = 3.1415926535897932384626433832795;

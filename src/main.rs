@@ -6,6 +6,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
+use bvh::aabb::Bounded;
+use bvh::bounding_hierarchy::BHShape;
+use bvh::Point3;
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
 use wgpu::{Device, Label, ShaderModule, TextureFormat};
@@ -18,7 +21,7 @@ use winit::{
 };
 
 use log::{error, info};
-use structs::{App, SwapchainData};
+use structs::{App, SwapchainData, Voxel};
 
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W};
@@ -335,6 +338,41 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         }
     });
 }
+
+impl Bounded for Voxel {
+    fn aabb(&self) -> bvh::aabb::AABB {
+        bvh::aabb::AABB::with_bounds(
+            Point3::new(
+                self.min[0] - self.pos[0],
+                self.min[1] - self.pos[1],
+                self.min[2] - self.pos[2],
+            ),
+            Point3::new(
+                self.max[0] - self.pos[0],
+                self.max[1] - self.pos[1],
+                self.max[2] - self.pos[2],
+            ),
+        )
+    }
+}
+
+impl BHShape for Voxel {
+    fn set_bh_node_index(&mut self, index: usize) {
+        self.node_index = index;
+    }
+    fn bh_node_index(&self) -> usize {
+        self.node_index
+    }
+}
+
+// impl Bounded<f32, 3> for Voxel {
+//     fn aabb(&self) -> Aabb<f32, 3> {
+//         // let half_size = SVector::<f32, 3>::new(self.radius, self.radius, self.radius);
+//         // let min = self.position - half_size;
+//         // let max = self.position + half_size;
+//         Aabb::with_bounds(min, max)
+//     }
+// }
 
 fn main() {
     env_logger::init();
