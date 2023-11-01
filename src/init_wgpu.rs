@@ -1,5 +1,5 @@
 use wgpu::{
-    Adapter, Backends, Device, Instance, InstanceDescriptor, Queue, Surface, SurfaceConfiguration,
+    Adapter, Backends, Device, Instance, InstanceDescriptor, Queue, Surface, SurfaceConfiguration, Limits,
 };
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -38,7 +38,10 @@ impl InitWgpu {
                 &wgpu::DeviceDescriptor {
                     label: None,
                     features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    limits: Limits {
+                        max_storage_buffer_binding_size: 536870912,
+                        ..wgpu::Limits::default()
+                    },
                 },
                 None,
             )
