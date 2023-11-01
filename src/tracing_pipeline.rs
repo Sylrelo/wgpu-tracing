@@ -74,7 +74,7 @@ impl TracingPipeline {
         compute_pass.set_bind_group(0, &self.render_texture_binds.bind_group, &[]);
         compute_pass.set_bind_group(1, &self.storage_binds.bind_group, &[]);
         // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
-        compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 9, 1);
+        compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 16, 1);
     }
 
     //TODO: Somehow merge or half-merge init_pipeline and recreate_pipeline
@@ -160,7 +160,7 @@ impl TracingPipeline {
         for x in 0..50 {
             for y in 0..50 {
                 for z in 0..50 {
-                    let generate = rng.gen_bool(0.1);
+                    let generate = rng.gen_bool(0.35);
 
                     let r: f32 = (rng.gen_range(0..255)) as f32 / 255.0;
                     let g = (rng.gen_range(0..255)) as f32 / 255.0;

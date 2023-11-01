@@ -110,7 +110,7 @@ fn get_normal(side: i32, delta: vec3<i32>) -> vec3<f32> {
     }
 }
 
-fn cast_dda(ray: Ray) -> VoxelTraversalHit {
+fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
     var map = vec3<i32>(ray.orig);
     let mapfl = vec3<f32>(map);
 
@@ -149,48 +149,49 @@ fn cast_dda(ray: Ray) -> VoxelTraversalHit {
     while voxel.w < 1.0 {
         iter += 1;
 
-        if iter >= 400 {
+        if iter >= maxSteps {
             break;
         }
-        // if max.x < max.y && max.x < max.z {
-        //     map.x += stepAmount.x;
-        //     max.x += delta.x;
-        //     side = 0;
-        // } else if max.y < max.z {
-        //     map.y += stepAmount.y;
-        //     max.y += delta.y;
-        //     side = 2;
-        // } else {
-        //     map.z += stepAmount.z;
-        //     max.z += delta.z;
-        //     side = 1;
-        // }
 
-        if max.x < max.y {
-            if max.x < max.z {
-                map.x += stepAmount.x;
-                // if map.x >= 20 || map.x < 0 {return vec4(0.0);}
-                max.x += delta.x;
-                side = 0;
-            } else {
-                map.z += stepAmount.z;
-                // if map.z >= 20 || map.z < 0 {return vec4(0.0);}
-                max.z += delta.z;
-                side = 1;
-            }
+        if max.x < max.y && max.x < max.z {
+            map.x += stepAmount.x;
+            max.x += delta.x;
+            side = 0;
+        } else if max.y < max.z {
+            map.y += stepAmount.y;
+            max.y += delta.y;
+            side = 2;
         } else {
-            if max.y < max.z {
-                map.y += stepAmount.y;
-                // if map.y >= 20 || map.y < 0 {return vec4(0.0);}
-                max.y += delta.y;
-                side = 2;
-            } else {
-                map.z += stepAmount.z;
-                // if map.z >= 20 || map.z < 0 {return vec4(0.0);}
-                max.z += delta.z;
-                side = 1;
-            }
+            map.z += stepAmount.z;
+            max.z += delta.z;
+            side = 1;
         }
+
+        // if max.x < max.y {
+        //     if max.x < max.z {
+        //         map.x += stepAmount.x;
+        //         // if map.x >= 20 || map.x < 0 {return vec4(0.0);}
+        //         max.x += delta.x;
+        //         side = 0;
+        //     } else {
+        //         map.z += stepAmount.z;
+        //         // if map.z >= 20 || map.z < 0 {return vec4(0.0);}
+        //         max.z += delta.z;
+        //         side = 1;
+        //     }
+        // } else {
+        //     if max.y < max.z {
+        //         map.y += stepAmount.y;
+        //         // if map.y >= 20 || map.y < 0 {return vec4(0.0);}
+        //         max.y += delta.y;
+        //         side = 2;
+        //     } else {
+        //         map.z += stepAmount.z;
+        //         // if map.z >= 20 || map.z < 0 {return vec4(0.0);}
+        //         max.z += delta.z;
+        //         side = 1;
+        //     }
+        // }
 
         if map.z < 0 || map.z >= 50 || map.x < 0 || map.x >= 50 || map.y < 0 || map.y >= 50 {
             continue;
@@ -471,7 +472,7 @@ fn raymarch(ray_origin: vec3<f32>, ray_direction: vec3<f32>) -> f32 {
     return 0.0;
 }
 
-const MAX_SAMPLES = 1;
+const MAX_SAMPLES = 2;
 // var<storage> seed: vec2<f32> = vec2<f32>(0.0, 0.0);
 
 const M_PI = 3.1415926535897932384626433832795;
@@ -533,7 +534,7 @@ fn RandomUnitVector(seed: ptr<function, u32>) -> vec3<f32> {
 
 fn raytrace(ray: Ray) -> vec3<f32> {
     // var hit: TriangleHit = TriangleHit(0, false, 0.0);
-    let voxelHit = cast_dda(ray);
+    let voxelHit = cast_dda(ray, 300);
 
     if voxelHit.has_hit {
         return (voxelHit.normal * 0.5) + 0.5;
@@ -546,11 +547,16 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
     var ray = ray_in;
 
-    for (var i = 0; i < 2; i++) {
+    var maxSteps = 300;
+    for (var i = 0; i < 4; i++) {
         // var hit: TriangleHit = TriangleHit(0, false, 0.0);
 
-        let hit = traverse_bvh(ray);
-        let voxelHit = cast_dda(ray);
+        // let hit = traverse_bvh(ray);
+        if (i > 1) {
+            maxSteps = 40;
+        }
+
+        let voxelHit = cast_dda(ray, maxSteps);
 
         // let hit = get_closest(ray);
         // let has_vox = cast_dda(ray);
@@ -559,14 +565,14 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         //     hit.has_hit = true;
         // }
 
-        if hit.has_hit == false {
+        if voxelHit.has_hit == false {
             color += vec3(1.00, 1.00, 1.00) * throughput;
             break ;
         }
-        let ray_position = ray.orig + ray.dir * hit.t;
-        let cube = voxels[hit.tri];
-        let normal = normal_cube(ray_position, cube.pos.xyz, cube.min.xyz, cube.max.xyz);
-
+        let ray_position = ray.orig + ray.dir * voxelHit.t;
+        // let cube = voxels[hit.tri];
+        // let normal = normal_cube(ray_position, cube.pos.xyz, cube.min.xyz, cube.max.xyz);
+        let normal = voxelHit.normal;
         // if hit.tri < 105 {
             // color += vec3(1.0, 1.0, 1.0) * throughput;
         // }
@@ -575,7 +581,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         throughput *= vec3(0.2, 0.3, 1.0);
 
         ray.orig = ray_position + normal * 0.001;
-        ray.dir = normalize(RandomUnitVector(seed) + normal);
+        ray.dir = normalize(RandomUnitVector(seed) + (normal * 0.5));
         precalc_ray(&ray);
         // ray.inv_dir = 1.0 / ray.dir;
     }
@@ -591,7 +597,7 @@ fn precalc_ray(ray: ptr<function, Ray>) {
 }
 
 @compute
-@workgroup_size(16, 9)
+@workgroup_size(16, 16)
 fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>,
 ) {
@@ -609,7 +615,7 @@ fn main(
         1.0 - 2.0 * ndc_pixel.y * tatan
     );
 
-    let ray_origin = vec3(15.0, 20.0, 59.5);
+    let ray_origin = vec3(25.0, 25.0, 65.5);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
     var ray: Ray = Ray(ray_origin, ray_direction, 1.0 / ray_direction, 0u, 0u, 0u);
     precalc_ray(&ray);
@@ -624,9 +630,6 @@ fn main(
     // var seed: vec2<f32> = vec2(0.0, 0.0);
     var seed: u32 = (u32(screen_pos.x) * (1973u) + u32(screen_pos.y) * (9277u) * (26699u)) | (1u);
     // var seed: u32 = uint rngState = u32(u32(fragCoord.x) * u32(1973) + u32(fragCoord.y) * u32(9277) + u32(iFrame) * u32(26699)) | u32(1);
-
-
-
 
     var path_tracing_color = vec3(0.0, 0.0, 0.0);
     for (var i = 0; i < MAX_SAMPLES; i++) {
