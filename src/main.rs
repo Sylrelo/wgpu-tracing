@@ -425,7 +425,7 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_visible(false)
-        .with_inner_size(Size::from(PhysicalSize::new(1920  * 2, 1080 * 2)))
+        .with_inner_size(Size::from(PhysicalSize::new(1920f32 * 1.5, 1080f32 * 1.5)))
         .build(&event_loop)
         .unwrap();
 

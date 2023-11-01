@@ -579,6 +579,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
             break ;
         }
         let ray_position = ray.orig + ray.dir * voxelHit.t;
+
         // let cube = voxels[hit.tri];
         // let normal = normal_cube(ray_position, cube.pos.xyz, cube.min.xyz, cube.max.xyz);
         let normal = voxelHit.normal;
@@ -589,6 +590,10 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         color += vec3(0.0, 0.0, 0.0) * throughput;
         throughput *= normal * 0.5 + 0.5;
         // throughput *= vec3(0.2, 0.3, 1.0);
+
+        // if (length(ray_position) > 145.0 && i >= 1) {
+        //     break;
+        // }
 
         ray.orig = ray_position + normal * 0.0001;
         ray.dir = normalize(RandomUnitVector(seed) + normal);
@@ -642,18 +647,17 @@ fn main(
     var seed: u32 = (u32(screen_pos.x) * (1973u) + u32(screen_pos.y) * (9277u) * (26699u)) | (1u);
     // var seed: u32 = uint rngState = u32(u32(fragCoord.x) * u32(1973) + u32(fragCoord.y) * u32(9277) + u32(iFrame) * u32(26699)) | u32(1);
 
-    var path_tracing_color = vec3(0.0, 0.0, 0.0);
-    for (var i = 0; i < MAX_SAMPLES; i++) {
-        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
-        // wang_hash(&seed);
-        path_tracing_color += pathtrace(ray, &seed);
-    }
-    path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
+    // var path_tracing_color = vec3(0.0, 0.0, 0.0);
+    // for (var i = 0; i < MAX_SAMPLES; i++) {
+    //     seed = ( 1973u * 9277u + u32(i) * 26699u) | (1u);
+    //     seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+    //     // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+    //     // wang_hash(&seed);
+    //     path_tracing_color += pathtrace(ray, &seed);
+    // }
+    // path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
+    // textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
 
-    // path_tracing_color = (path_tracing_color + raytrace(ray).xyz) / 2.0;
-
-    textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
-
-    // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
+    textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 
 }

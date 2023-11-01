@@ -178,7 +178,7 @@ impl TracingPipeline {
         for x in 0..100 {
             for y in 0..100 {
                 for z in 0..100 {
-                    let generate = rng.gen_bool(0.25);
+                    let generate = rng.gen_bool(0.03);
 
                     let r: f32 = (rng.gen_range(0..255)) as f32 / 255.0;
                     let g = (rng.gen_range(0..255)) as f32 / 255.0;
