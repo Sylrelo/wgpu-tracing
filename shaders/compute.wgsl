@@ -68,7 +68,49 @@ var<storage> voxelworld: array<VoxelWorldTest>;
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-fn cast_dda(ray: Ray) -> vec4<f32> {
+struct VoxelTraversalHit {
+    has_hit: bool,
+    t: f32,
+    normal: vec3<f32>,
+    color: vec3<f32>,
+}
+
+fn get_dist(ray: Ray, side: i32, map: vec3<i32>, stepAmount: vec3<i32>) -> f32 {
+    var t = 0.0;
+
+    if side == 0 {
+        t = (f32(map.x) - ray.orig.x + f32(1 - stepAmount.x) / 2.0) / ray.dir.x;
+    } else if side == 1 {
+        t = (f32(map.z) - ray.orig.z + f32(1 - stepAmount.z) / 2.0) / ray.dir.z;
+    } else {
+        t = (f32(map.y) - ray.orig.y + f32(1 - stepAmount.y) / 2.0) / ray.dir.y;
+    }
+
+    return t;
+}
+
+fn get_normal(side: i32, delta: vec3<i32>) -> vec3<f32> {
+
+    if side == 0 && delta.x > 0 {
+        return vec3(1.0, 0.0, 0.0);
+    } else if side == 0 && delta.x < 0 {
+        return vec3(-1.0, 0.0, 0.0);
+    } 
+
+    if side == 1 && delta.z < 0 {
+        return vec3(0.0, 0.0, -1.0);
+    } else if side == 1 && delta.z > 0 {
+        return vec3(0.0, 0.0, 1.0);
+    }
+
+    if delta.y > 0 {
+        return vec3(0.0, 1.0, 0.0);
+    } else {
+        return vec3(0.0, -1.0, 0.0);
+    }
+}
+
+fn cast_dda(ray: Ray) -> VoxelTraversalHit {
     var map = vec3<i32>(ray.orig);
     let mapfl = vec3<f32>(map);
 
@@ -149,24 +191,17 @@ fn cast_dda(ray: Ray) -> vec4<f32> {
                 side = 1;
             }
         }
-        
+
         if map.z < 0 || map.z >= 50 || map.x < 0 || map.x >= 50 || map.y < 0 || map.y >= 50 {
             continue;
         }
         voxel = voxelworld[map.y * 50 * 50 + map.z * 50 + map.x].voxel;
         // voxelworld[map.y * MAP_WIDTH * MAP_HEIGHT + map.z * MAP_WIDTH + map.x];
     }
-	// else
-	// {
-	// 	stepAmount.x = 0;
-	// 	max.x = 0.0;
-	// }
 
-    return voxel;
+
+    return VoxelTraversalHit(voxel.w > 0.9, get_dist(ray, side, map, stepAmount), get_normal(side, stepAmount), voxel.xyz);
 }
-
-
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -496,13 +531,12 @@ fn RandomUnitVector(seed: ptr<function, u32>) -> vec3<f32> {
 //     return cos(r.x) * oneminus * o1 + sin(r.x) * oneminus * o2 + r.y * dir;
 // }
 
-fn raytrace(ray: Ray) -> vec3<f32>
-{
-    var hit: TriangleHit = TriangleHit(0, false, 0.0);
-    let voxel = cast_dda(ray);
+fn raytrace(ray: Ray) -> vec3<f32> {
+    // var hit: TriangleHit = TriangleHit(0, false, 0.0);
+    let voxelHit = cast_dda(ray);
 
-    if voxel.w > 0.9 {
-        return voxel.xyz;
+    if voxelHit.has_hit {
+        return (voxelHit.normal * 0.5) + 0.5;
     }
     return vec3(0.0, 0.0, 0.0);
 }
@@ -516,6 +550,8 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         // var hit: TriangleHit = TriangleHit(0, false, 0.0);
 
         let hit = traverse_bvh(ray);
+        let voxelHit = cast_dda(ray);
+
         // let hit = get_closest(ray);
         // let has_vox = cast_dda(ray);
 
@@ -573,7 +609,7 @@ fn main(
         1.0 - 2.0 * ndc_pixel.y * tatan
     );
 
-    let ray_origin = vec3(15.0, 20.0, 40.5);
+    let ray_origin = vec3(15.0, 20.0, 59.5);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
     var ray: Ray = Ray(ray_origin, ray_direction, 1.0 / ray_direction, 0u, 0u, 0u);
     precalc_ray(&ray);
@@ -592,16 +628,15 @@ fn main(
 
 
 
-    // var path_tracing_color = vec3(0.0, 0.0, 0.0);
-    // for (var i = 0; i < MAX_SAMPLES; i++) {
-    //     seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
-    //     // wang_hash(&seed);
-    //     path_tracing_color += pathtrace(ray, &seed);
-    // }
-    // path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
-    // textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
+    var path_tracing_color = vec3(0.0, 0.0, 0.0);
+    for (var i = 0; i < MAX_SAMPLES; i++) {
+        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+        // wang_hash(&seed);
+        path_tracing_color += pathtrace(ray, &seed);
+    }
+    path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
+    textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
 
 
-     textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
-
+    // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }
