@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::process::exit;
+use std::time::Instant;
 
 use bvh::aabb::AABB;
 use bvh::bvh::BVH;
@@ -12,28 +13,41 @@ use wgpu::{
     TextureView,
 };
 
-use crate::structs::{BvhNodeGpu, Triangle, Voxel, INTERNAL_H, INTERNAL_W, VoxelWorldTest};
+use crate::structs::{BvhNodeGpu, Triangle, Voxel, INTERNAL_H, INTERNAL_W, VoxelWorldTest, Camera};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
 pub struct TracingPipeline {
     pub pipeline: ComputePipeline,
 
     pub render_texture_binds: BindGroups,
-    // pub uniform_binds: BindGroups,
+    pub uniform_binds: BindGroups,
     pub storage_binds: BindGroups,
 
-    // pub uniform_buffer: Buffer,
+    pub uniform_buffer: Buffer,
     pub triangles_buffer: Buffer,
 
     pub voxels_buffer: Buffer,
 }
 
 impl TracingPipeline {
-    pub fn new(device: &Device, render_texture: &TextureView) -> TracingPipeline {
+    pub fn new(device: &Device, render_texture: &TextureView, camera: Camera) -> TracingPipeline {
         let (triangles_buffer, voxels_buffer, bvh_buffer, dda_buffer) =
             Self::create_triangle_buffer_tmp_todo_remove(device);
 
         // let storage_binds = Self::init_bind_storage(device, &triangles_buffer);
+
+        let cameraUniformBuffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("[Compute Uniform] Buffer"),
+            contents: bytemuck::cast_slice(&[camera]),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let uniform_binds = BindingGeneratorBuilder::new(device)
+        .with_default_buffer_uniform(ShaderStages::COMPUTE, &cameraUniformBuffer)
+        .done()
+        .build()
+        ;
+
 
         let storage_binds = BindingGeneratorBuilder::new(device)
             .with_default_buffer_storage(ShaderStages::COMPUTE, &triangles_buffer, true)
@@ -53,15 +67,16 @@ impl TracingPipeline {
             &[
                 &render_texture_binds.bind_group_layout,
                 &storage_binds.bind_group_layout,
+                &uniform_binds.bind_group_layout,
             ],
         );
 
         TracingPipeline {
             pipeline,
             render_texture_binds,
-            // uniform_binds: BindGroups {},
+            uniform_binds: uniform_binds,
             storage_binds,
-            // uniform_buffer: (),
+            uniform_buffer: cameraUniformBuffer,
             triangles_buffer,
             voxels_buffer,
         }
@@ -73,7 +88,7 @@ impl TracingPipeline {
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_bind_group(0, &self.render_texture_binds.bind_group, &[]);
         compute_pass.set_bind_group(1, &self.storage_binds.bind_group, &[]);
-        // compute_pass.set_bind_group(2, &triangle_buffer_binding.bind_group, &[]);
+        compute_pass.set_bind_group(2, &self.uniform_binds.bind_group, &[]);
         compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 16, 1);
     }
 
@@ -84,6 +99,7 @@ impl TracingPipeline {
             bind_group_layouts: &[
                 &self.render_texture_binds.bind_group_layout,
                 &self.storage_binds.bind_group_layout,
+                &self.uniform_binds.bind_group_layout
             ],
             push_constant_ranges: &[],
         });
@@ -154,17 +170,26 @@ impl TracingPipeline {
 
         let mut test_voxels_list: Vec<Voxel> = Vec::new();
 
-        let mut test_voxels_array_dda: Vec<VoxelWorldTest> =  Vec::new();
+        let mut test_voxels_array_dda: Vec<VoxelWorldTest> = Vec::new();
+
         let mut rng = rand::thread_rng();
 
-        for x in 0..50 {
-            for y in 0..50 {
-                for z in 0..50 {
-                    let generate = rng.gen_bool(0.35);
+        let now = Instant::now();
+        for x in 0..100 {
+            for y in 0..100 {
+                for z in 0..100 {
+                    let generate = rng.gen_bool(0.25);
 
                     let r: f32 = (rng.gen_range(0..255)) as f32 / 255.0;
                     let g = (rng.gen_range(0..255)) as f32 / 255.0;
                     let b = (rng.gen_range(0..255)) as f32 / 255.0;
+
+                    // test_voxels_array_dda[x] = VoxelWorldTest { voxel: [
+                    //     r,
+                    //     g,
+                    //     (z * 5) as f32 / 255.0, 
+                    //     generate as u32 as f32
+                        // ] };
 
                     test_voxels_array_dda.push(VoxelWorldTest { voxel: [
                         // (x * 5) as f32 / 255.0, 
@@ -178,6 +203,8 @@ impl TracingPipeline {
                 }
             }
         }
+        // let then  = Instant::now();
+        println!("====> Elapsed: {}", now.elapsed().as_millis());
         // println!("{:?}", test_voxels_array_dda);
 
         for _i in 0..500 {
@@ -216,7 +243,7 @@ impl TracingPipeline {
 
         let bvh = BVH::build(&mut test_voxels_list);
 
-        println!("{}", test_voxels_list[4].node_index);
+        // println!("{}", test_voxels_list[4].node_index);
 
         // let flatten = bvh.flatten();
 

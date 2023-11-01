@@ -13,6 +13,7 @@ use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
 use wgpu::{Device, Label, ShaderModule, TextureFormat};
 use winit::dpi::{PhysicalSize, Size};
+use winit::event::{ElementState, ScanCode};
 use winit::window::WindowBuilder;
 use winit::{
     event::{Event, WindowEvent},
@@ -24,7 +25,7 @@ use log::{error, info};
 use structs::{App, SwapchainData, Voxel};
 
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W};
+use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W, Camera};
 use crate::tracing_pipeline::TracingPipeline;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
@@ -84,6 +85,10 @@ fn compile_shader(device: &Device) -> Option<ShaderModule> {
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
+    let mut camera = Camera{
+        position: [25.0, 125.0, 105.5, 0.0]
+    };
+
 
     // TEX TEST
     let diffuse_bytes = include_bytes!("teddy.jpg");
@@ -151,7 +156,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // pipeline_tracing.uniform_update(&app.queue);
     ///////////////////////////////////////////////////////////
 
-    let tracing_pipeline = TracingPipeline::new(&app.device, &diffuse_texture_view);
+    let tracing_pipeline = TracingPipeline::new(&app.device, &diffuse_texture_view, camera);
 
     //////////
 
@@ -264,6 +269,45 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         let tracing_pipeline = tracing_pipeline.lock().unwrap();
         match event {
             Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {input, ..},
+                ..
+            } => {
+                if input.state != ElementState::Pressed {
+                    return ;
+                }
+
+                match input.scancode {
+                    13 => {
+                        camera.position[2] -= 0.35;
+                    },
+                    1 => {
+                        camera.position[2] += 0.35;
+                    },
+                    0 => {
+                        camera.position[0] -= 0.35;
+                    },
+                    2 => {
+                        camera.position[0] += 0.35;
+                    },
+                    15 => {
+                        camera.position[1] += 0.35;
+                    },
+                    3 => {
+                        camera.position[1] -= 0.35;
+                    },
+                    _ => ()
+                }
+
+                app.queue.write_buffer(
+                            &tracing_pipeline.uniform_buffer,
+                            0,
+                            bytemuck::cast_slice(&[camera]),
+                        );
+
+                // println!("{} Hello mofo", input.scancode);
+            },
+
+            Event::WindowEvent {
                 event: WindowEvent::Resized(..),
                 ..
             } => {
@@ -290,7 +334,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // println!("Done !");
                 app.window.request_redraw();
             }
-
             Event::RedrawRequested(_) => {
                 let frame = app
                     .surface
@@ -382,7 +425,7 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_visible(false)
-        .with_inner_size(Size::from(PhysicalSize::new(1920, 1080)))
+        .with_inner_size(Size::from(PhysicalSize::new(1920  * 2, 1080 * 2)))
         .build(&event_loop)
         .unwrap();
 

@@ -46,6 +46,10 @@ struct VoxelWorldTest {
     voxel: vec4<f32>,
 }
 
+struct Camera {
+    position: vec4<f32>
+}
+
 
 @group(0) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
@@ -65,6 +69,8 @@ var<storage> bvh: array<BvhNodeGpu>;
 @group(1) @binding(3)
 var<storage> voxelworld: array<VoxelWorldTest>;
 
+@group(2) @binding(0)
+var<uniform> cameraUniform: Camera;
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,27 +98,30 @@ fn get_dist(ray: Ray, side: i32, map: vec3<i32>, stepAmount: vec3<i32>) -> f32 {
 fn get_normal(side: i32, delta: vec3<i32>) -> vec3<f32> {
 
     if side == 0 && delta.x > 0 {
-        return vec3(1.0, 0.0, 0.0);
-    } else if side == 0 && delta.x < 0 {
         return vec3(-1.0, 0.0, 0.0);
+    } else if side == 0 && delta.x < 0 {
+        return vec3(1.0, 0.0, 0.0);
     } 
 
     if side == 1 && delta.z < 0 {
-        return vec3(0.0, 0.0, -1.0);
-    } else if side == 1 && delta.z > 0 {
         return vec3(0.0, 0.0, 1.0);
+    } else if side == 1 && delta.z > 0 {
+        return vec3(0.0, 0.0, -1.0);
     }
 
     if delta.y > 0 {
-        return vec3(0.0, 1.0, 0.0);
-    } else {
         return vec3(0.0, -1.0, 0.0);
+    } else {
+        return vec3(0.0, 1.0, 0.0);
     }
+}
+
+fn cast_dda_branchless() 
+{
 }
 
 fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
     var map = vec3<i32>(ray.orig);
-    let mapfl = vec3<f32>(map);
 
     var stepAmount = vec3(0);
     let delta = vec3(abs(ray.inv_dir));
@@ -122,26 +131,26 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
 
     if ray.dir.x < 0.0 {
         stepAmount.x = -1;
-        max.x = (ray.orig.x - mapfl.x) * delta.x;
+        max.x = (ray.orig.x - f32(map.x)) * delta.x;
     } else if ray.dir.x > 0.0 {
         stepAmount.x = 1;
-        max.x = (mapfl.x + 1.0 - ray.orig.x) * delta.x;
+        max.x = (f32(map.x) + 1.0 - ray.orig.x) * delta.x;
     }
 
     if ray.dir.y < 0.0 {
         stepAmount.y = -1;
-        max.y = (ray.orig.y - mapfl.y) * delta.y;
+        max.y = (ray.orig.y - f32(map.y)) * delta.y;
     } else if ray.dir.y > 0.0 {
         stepAmount.y = 1;
-        max.y = (mapfl.y + 1.0 - ray.orig.y) * delta.y;
+        max.y = (f32(map.y) + 1.0 - ray.orig.y) * delta.y;
     }
 
     if ray.dir.z < 0.0 {
         stepAmount.z = -1;
-        max.z = (ray.orig.z - mapfl.z) * delta.z;
+        max.z = (ray.orig.z - f32(map.z)) * delta.z;
     } else if ray.dir.z > 0.0 {
         stepAmount.z = 1;
-        max.z = (mapfl.z + 1.0 - ray.orig.z) * delta.z;
+        max.z = (f32(map.z) + 1.0 - ray.orig.z) * delta.z;
     }
 
     var iter = 0;
@@ -193,10 +202,10 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
         //     }
         // }
 
-        if map.z < 0 || map.z >= 50 || map.x < 0 || map.x >= 50 || map.y < 0 || map.y >= 50 {
+        if map.z < 0 || map.z >= 100 || map.x < 0 || map.x >= 100 || map.y < 0 || map.y >= 100 {
             continue;
         }
-        voxel = voxelworld[map.y * 50 * 50 + map.z * 50 + map.x].voxel;
+        voxel = voxelworld[map.y * 100 * 100 + map.z * 100 + map.x].voxel;
         // voxelworld[map.y * MAP_WIDTH * MAP_HEIGHT + map.z * MAP_WIDTH + map.x];
     }
 
@@ -495,13 +504,13 @@ fn RandomFloat01(seed: ptr<function, u32>) -> f32 {
 }
  
 fn RandomUnitVector(seed: ptr<function, u32>) -> vec3<f32> {
-    let z = RandomFloat01(seed) * 2.0f - 1.0f;
+    let z = RandomFloat01(seed) * 2.0 - 1.0;
     let a = RandomFloat01(seed) * M_PI_TWO;
     let r = sqrt(1.0f - z * z);
     let x = r * cos(a);
     let y = r * sin(a);
 
-    return vec3(x, y, z);
+    return (vec3(x, y, z));
 }
 
 
@@ -548,7 +557,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
     var ray = ray_in;
 
     var maxSteps = 300;
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 8; i++) {
         // var hit: TriangleHit = TriangleHit(0, false, 0.0);
 
         // let hit = traverse_bvh(ray);
@@ -578,10 +587,11 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         // }
 
         color += vec3(0.0, 0.0, 0.0) * throughput;
-        throughput *= vec3(0.2, 0.3, 1.0);
+        throughput *= normal * 0.5 + 0.5;
+        // throughput *= vec3(0.2, 0.3, 1.0);
 
-        ray.orig = ray_position + normal * 0.001;
-        ray.dir = normalize(RandomUnitVector(seed) + (normal * 0.5));
+        ray.orig = ray_position + normal * 0.0001;
+        ray.dir = normalize(RandomUnitVector(seed) + normal);
         precalc_ray(&ray);
         // ray.inv_dir = 1.0 / ray.dir;
     }
@@ -615,7 +625,8 @@ fn main(
         1.0 - 2.0 * ndc_pixel.y * tatan
     );
 
-    let ray_origin = vec3(25.0, 25.0, 65.5);
+    let ray_origin = cameraUniform.position.xyz;
+    // let ray_origin = vec3(25.0, 25.0, 65.5);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
     var ray: Ray = Ray(ray_origin, ray_direction, 1.0 / ray_direction, 0u, 0u, 0u);
     precalc_ray(&ray);
@@ -638,8 +649,11 @@ fn main(
         path_tracing_color += pathtrace(ray, &seed);
     }
     path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
+
+    // path_tracing_color = (path_tracing_color + raytrace(ray).xyz) / 2.0;
+
     textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
 
-
     // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
+
 }

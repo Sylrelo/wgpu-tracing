@@ -31,6 +31,12 @@ pub struct App {
     pub swapchain_config: SwapchainData,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct Camera {
+    pub position: [f32; 4]
+}
+
 // UNIFORMS
 
 #[repr(C)]
