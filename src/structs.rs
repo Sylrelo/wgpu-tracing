@@ -58,6 +58,13 @@ pub struct Voxel {
     pub _padding: usize,
 }
 
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct VoxelWorldTest {
+    pub voxel: [f32; 4],
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct BvhNodeGpu {

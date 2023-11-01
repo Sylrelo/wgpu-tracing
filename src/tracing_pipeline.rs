@@ -12,7 +12,7 @@ use wgpu::{
     TextureView,
 };
 
-use crate::structs::{BvhNodeGpu, Triangle, Voxel, INTERNAL_H, INTERNAL_W};
+use crate::structs::{BvhNodeGpu, Triangle, Voxel, INTERNAL_H, INTERNAL_W, VoxelWorldTest};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
 pub struct TracingPipeline {
@@ -30,7 +30,7 @@ pub struct TracingPipeline {
 
 impl TracingPipeline {
     pub fn new(device: &Device, render_texture: &TextureView) -> TracingPipeline {
-        let (triangles_buffer, voxels_buffer, bvh_buffer) =
+        let (triangles_buffer, voxels_buffer, bvh_buffer, dda_buffer) =
             Self::create_triangle_buffer_tmp_todo_remove(device);
 
         // let storage_binds = Self::init_bind_storage(device, &triangles_buffer);
@@ -41,6 +41,8 @@ impl TracingPipeline {
             .with_default_buffer_storage(ShaderStages::COMPUTE, &voxels_buffer, true)
             .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &bvh_buffer, true)
+            .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &dda_buffer, true)
             .done()
             .build();
 
@@ -131,7 +133,7 @@ impl TracingPipeline {
             .build()
     }
 
-    fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> (Buffer, Buffer, Buffer) {
+    fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> (Buffer, Buffer, Buffer, Buffer) {
         let mut test_triangles_list = vec![
             Triangle {
                 p0: [0.0, 0.0, 0.0, 0.0],
@@ -151,6 +153,32 @@ impl TracingPipeline {
         ];
 
         let mut test_voxels_list: Vec<Voxel> = Vec::new();
+
+        let mut test_voxels_array_dda: Vec<VoxelWorldTest> =  Vec::new();
+        let mut rng = rand::thread_rng();
+
+        for x in 0..50 {
+            for y in 0..50 {
+                for z in 0..50 {
+                    let generate = rng.gen_bool(0.1);
+
+                    let r: f32 = (rng.gen_range(0..255)) as f32 / 255.0;
+                    let g = (rng.gen_range(0..255)) as f32 / 255.0;
+                    let b = (rng.gen_range(0..255)) as f32 / 255.0;
+
+                    test_voxels_array_dda.push(VoxelWorldTest { voxel: [
+                        // (x * 5) as f32 / 255.0, 
+                        // (y * 5) as f32 / 255.0, 
+                        // (z * 5) as f32 / 255.0, 
+                        r,
+                        g,
+                        (z * 5) as f32 / 255.0, 
+                        generate as u32 as f32
+                        ] })
+                }
+            }
+        }
+        // println!("{:?}", test_voxels_array_dda);
 
         for _i in 0..500 {
             let mut rng = rand::thread_rng();
@@ -174,13 +202,15 @@ impl TracingPipeline {
         }
         for x in 0..30 {
             for z in 0..30 {
-                test_voxels_list.push(Voxel {
-                    min: [-0.5, -0.5, -0.5, 0.0],
-                    max: [0.5, 0.5, 0.5, 0.0],
-                    pos: [15.0 - x as f32, 3.0, 15.0 - z as f32, 0.0],
-                    node_index: 0,
-                    _padding: 0,
-                });
+                // for y in 0..30 {
+                    test_voxels_list.push(Voxel {
+                        min: [-0.5, -0.5, -0.5, 0.0],
+                        max: [0.5, 0.5, 0.5, 0.0],
+                        pos: [15.0 - x as f32, 3.0, 15.0 - z as f32, 0.0],
+                        node_index: 0,
+                        _padding: 0,
+                    });
+                // }
             }
         }
 
@@ -195,17 +225,21 @@ impl TracingPipeline {
 
         let flatten = bvh.flatten_custom(&custom_constructor);
 
-        for (index, flat) in flatten.iter().enumerate() {
-            println!(
-                "{:>10} - entry: {:<10} | exit: {:<10} | {:<10} - {:?} {:?}",
-                index,
-                flat.entry_index,
-                flat.exit_index,
-                flat.shape_index,
-                flat.aabb_min,
-                flat.aabb_max,
-            );
-        }
+        // for (index, flat) in flatten.iter().enumerate() {
+        //     println!(
+        //         "{:>10} - entry: {:<10} | exit: {:<10} | {:<10} - {:?} {:?}",
+        //         index,
+        //         flat.entry_index,
+        //         flat.exit_index,
+        //         flat.shape_index,
+        //         flat.aabb_min,
+        //         flat.aabb_max,
+        //     );
+
+        //     if (flat.shape_index != u32::MAX) {
+        //         println!("{}", test_voxels_list[flat.shape_index as usize].node_index);
+        //     }
+        // }
 
         // exit(0);
 
@@ -227,7 +261,13 @@ impl TracingPipeline {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
-        return (triangle_buffer, voxel_buffer, bvh_buffer);
+        let dda_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("[Compute Uniform] Buffer DDA"),
+            contents: bytemuck::cast_slice(test_voxels_array_dda.as_slice()),
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
+
+        return (triangle_buffer, voxel_buffer, bvh_buffer, dda_buffer);
     }
 
     // pub fn uniform_init(device: &Device, uniform: ComputeUniform) -> Buffer {
