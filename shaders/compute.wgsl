@@ -37,9 +37,9 @@ struct Ray {
     orig: vec3<f32>,
     dir: vec3<f32>,
     inv_dir: vec3<f32>,
-    sign_x: u32,
-    sign_y: u32,
-    sign_z: u32
+    // sign_x: u32,
+    // sign_y: u32,
+    // sign_z: u32
 }
 
 struct VoxelWorldTest {
@@ -594,7 +594,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
     var ray = ray_in;
 
-    var maxSteps = 350;
+    var maxSteps = 300;
     for (var i = 0; i < 6; i++) {
         // var hit: TriangleHit = TriangleHit(0, false, 0.0);
 
@@ -636,7 +636,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         ray.orig = ray_position + normal * 0.0001;
         ray.dir = normalize(RandomUnitVector(seed) + normal);
         precalc_ray(&ray);
-        maxSteps = 50;
+        // maxSteps = 50;
         maxSteps = i32(90.0 / (f32(i) + 1.0));
   
         // maxSteps = 4;
@@ -647,9 +647,9 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
 }
 
 fn precalc_ray(ray: ptr<function, Ray>) {
-    (*ray).sign_x = u32((*ray).dir.x < 0.0);
-    (*ray).sign_y = u32((*ray).dir.y < 0.0);
-    (*ray).sign_z = u32((*ray).dir.z < 0.0);
+    // (*ray).sign_x = u32((*ray).dir.x < 0.0);
+    // (*ray).sign_y = u32((*ray).dir.y < 0.0);
+    // (*ray).sign_z = u32((*ray).dir.z < 0.0);
     (*ray).inv_dir = 1.0 / (*ray).dir;
 }
 
@@ -675,7 +675,7 @@ fn main(
     let ray_origin = cameraUniform.position.xyz;
     // let ray_origin = vec3(25.0, 25.0, 65.5);
     let ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
-    var ray: Ray = Ray(ray_origin, ray_direction, 1.0 / ray_direction, 0u, 0u, 0u);
+    var ray: Ray = Ray(ray_origin, ray_direction, 1.0 / ray_direction);
     precalc_ray(&ray);
 
     var final_color = vec4<f32>(0.025, 0.025, 0.025, 1.0);

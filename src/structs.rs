@@ -1,4 +1,4 @@
-use wgpu::{PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
+use wgpu::{PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat, Texture, TextureView};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -32,6 +32,7 @@ pub struct App {
     pub window: Window,
     pub swapchain_config: SwapchainData,
 }
+
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]

@@ -38,6 +38,7 @@ mod init_wgpu;
 mod structs;
 mod tracing_pipeline;
 mod utils;
+mod init_textures;
 
 impl App {
     pub async fn new(window: Window) -> App {
