@@ -329,12 +329,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
+                        occlusion_query_set: None,
+                        timestamp_writes: None,
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
+                        
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: true,
+                                store: wgpu::StoreOp::Store,
+                            
                             },
                         })],
                         depth_stencil_attachment: None,

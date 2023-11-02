@@ -14,6 +14,7 @@ impl InitWgpu {
         let instance = Instance::new(InstanceDescriptor {
             backends: Backends::DX12 | Backends::METAL | Backends::DX11,
             dx12_shader_compiler: Default::default(),
+            ..Default::default()
         });
 
         let surface = unsafe { instance.create_surface(&window) }.unwrap();
