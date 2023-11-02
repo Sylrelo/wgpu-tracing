@@ -1,5 +1,6 @@
 use wgpu::{
-    Adapter, Backends, Device, Instance, InstanceDescriptor, Queue, Surface, SurfaceConfiguration, Limits,
+    Adapter, Backends, Device, Instance, InstanceDescriptor, Limits, Queue, Surface,
+    SurfaceConfiguration,
 };
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -11,7 +12,7 @@ pub struct InitWgpu {}
 impl InitWgpu {
     pub fn create_instance(window: &Window) -> (Instance, Surface) {
         let instance = Instance::new(InstanceDescriptor {
-            backends: Backends::DX12 | Backends::METAL | Backends::DX11,
+            backends: Backends::DX12 | Backends::METAL | Backends::DX11 | Backends::VULKAN,
             dx12_shader_compiler: Default::default(),
         });
 

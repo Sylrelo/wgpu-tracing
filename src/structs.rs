@@ -2,8 +2,10 @@ use wgpu::{PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-pub const INTERNAL_W: u32 = (1920.0f32 / 1.0) as u32;
-pub const INTERNAL_H: u32 = (1080.0f32 / 1.0) as u32;
+// pub const INTERNAL_W: u32 = (1920.0f32 / 1.0) as u32;
+// pub const INTERNAL_H: u32 = (1080.0f32 / 1.0) as u32;
+pub const INTERNAL_W: u32 = (1280) as u32;
+pub const INTERNAL_H: u32 = (720) as u32;
 
 pub struct SwapchainData {
     pub capabilities: SurfaceCapabilities,
@@ -34,7 +36,7 @@ pub struct App {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Camera {
-    pub position: [f32; 4]
+    pub position: [f32; 4],
 }
 
 // UNIFORMS
@@ -63,7 +65,6 @@ pub struct Voxel {
     pub node_index: usize,
     pub _padding: usize,
 }
-
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
