@@ -427,10 +427,10 @@ fn main() {
     // let mut filter_output = vec![0.0f32; input_img.len()];
 
     unsafe {
-        let device = oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_DEFAULT);
+        let device = oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_HIP);
         oidn2_sys::oidnCommitDevice(device);
 
-        let buff = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
+        let color_buffer = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
         let output_buffer = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
 
         let filter = oidn2_sys::oidnNewFilter(device, CString::new("RT").unwrap().into_raw());
@@ -445,15 +445,27 @@ fn main() {
             0,
             0,
         );
+        oidn2_sys::oidnSetFilterImage(
+            filter,
+            CString::new("color").unwrap().into_raw(),
+            color_buffer,
+            oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
+            1280,
+            720,
+            0,
+            0,
+            0,
+        );
 
         oidn2_sys::oidnCommitFilter(filter);
 
+        let pute = oidn2_sys::oidnGetBufferData(color_buffer);
+        let slice = std::slice::from_raw_parts_mut(pute as *mut f32, 1280 * 720 * 3 * 4);
+
+        oidn2_sys::oidnReleaseBuffer(color_buffer);
         oidn2_sys::oidnExecuteFilter(filter);
-
         let mut caca = CString::new("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
-
         oidn2_sys::oidnGetDeviceError(device, &mut caca.as_ptr());
-
         println!("=> {:?}", caca.as_bytes());
     }
 
