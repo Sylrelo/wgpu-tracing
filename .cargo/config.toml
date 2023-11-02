@@ -1,2 +1,3 @@
 [build]
+# rustflags = ["-LE:\\Downloads\\oidn-2.1.0.x64.windows\\bin"]
 rustflags = ["-L/home/slopez/Downloads/oidn/lib"]
