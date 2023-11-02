@@ -687,6 +687,7 @@ dependencies = [
  "jpeg-decoder",
  "num-rational",
  "num-traits",
+ "png",
 ]
 
 [[package]]

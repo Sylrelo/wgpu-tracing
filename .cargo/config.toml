@@ -1,0 +1,2 @@
+[build]
+rustflags = ["-L/home/slopez/Downloads/oidn/lib"]

@@ -13,7 +13,7 @@ use wgpu::{
     TextureView,
 };
 
-use crate::structs::{BvhNodeGpu, Triangle, Voxel, INTERNAL_H, INTERNAL_W, VoxelWorldTest, Camera};
+use crate::structs::{BvhNodeGpu, Camera, Triangle, Voxel, VoxelWorldTest, INTERNAL_H, INTERNAL_W};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
 pub struct TracingPipeline {
@@ -24,14 +24,16 @@ pub struct TracingPipeline {
     pub storage_binds: BindGroups,
 
     pub uniform_buffer: Buffer,
-    pub triangles_buffer: Buffer,
 
-    pub voxels_buffer: Buffer,
+    pub grid_buffer: Buffer,
+    pub test_voxels_array_dda: Vec<VoxelWorldTest>, // pub triangles_buffer: Buffer,
+
+                                                    // pub voxels_buffer: Buffer,
 }
 
 impl TracingPipeline {
     pub fn new(device: &Device, render_texture: &TextureView, camera: Camera) -> TracingPipeline {
-        let (triangles_buffer, voxels_buffer, bvh_buffer, dda_buffer) =
+        let (dda_buffer, test_voxels_array_dda) =
             Self::create_triangle_buffer_tmp_todo_remove(device);
 
         // let storage_binds = Self::init_bind_storage(device, &triangles_buffer);
@@ -43,19 +45,17 @@ impl TracingPipeline {
         });
 
         let uniform_binds = BindingGeneratorBuilder::new(device)
-        .with_default_buffer_uniform(ShaderStages::COMPUTE, &cameraUniformBuffer)
-        .done()
-        .build()
-        ;
-
+            .with_default_buffer_uniform(ShaderStages::COMPUTE, &cameraUniformBuffer)
+            .done()
+            .build();
 
         let storage_binds = BindingGeneratorBuilder::new(device)
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &triangles_buffer, true)
-            .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &voxels_buffer, true)
-            .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &bvh_buffer, true)
-            .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &triangles_buffer, true)
+            // .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &voxels_buffer, true)
+            // .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &bvh_buffer, true)
+            // .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &dda_buffer, true)
             .done()
             .build();
@@ -77,8 +77,9 @@ impl TracingPipeline {
             uniform_binds: uniform_binds,
             storage_binds,
             uniform_buffer: cameraUniformBuffer,
-            triangles_buffer,
-            voxels_buffer,
+            grid_buffer: dda_buffer,
+            test_voxels_array_dda: test_voxels_array_dda, // triangles_buffer,
+                                                          // voxels_buffer,
         }
     }
 
@@ -99,7 +100,7 @@ impl TracingPipeline {
             bind_group_layouts: &[
                 &self.render_texture_binds.bind_group_layout,
                 &self.storage_binds.bind_group_layout,
-                &self.uniform_binds.bind_group_layout
+                &self.uniform_binds.bind_group_layout,
             ],
             push_constant_ranges: &[],
         });
@@ -149,108 +150,72 @@ impl TracingPipeline {
             .build()
     }
 
-    fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> (Buffer, Buffer, Buffer, Buffer) {
-        let mut test_triangles_list = vec![
-            Triangle {
-                p0: [0.0, 0.0, 0.0, 0.0],
-                p1: [0.5, 0.0, 0.0, 0.0],
-                p2: [0.5, 0.5, 0.0, 0.0],
-            },
-            Triangle {
-                p0: [0.0, 0.5, 0.0, 0.0],
-                p1: [0.5, 0.5, 0.0, 0.0],
-                p2: [0.5, 1.0, 0.0, 0.0],
-            },
-            Triangle {
-                p0: [0.0, -0.5, 0.0, 0.0],
-                p1: [-0.5, -0.5, 0.0, 0.0],
-                p2: [-0.5, -1.0, 0.0, 0.0],
-            },
-        ];
+    fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> (Buffer, Vec<VoxelWorldTest>) {
+        // let mut test_triangles_list = vec![
+        //     Triangle {
+        //         p0: [0.0, 0.0, 0.0, 0.0],
+        //         p1: [0.5, 0.0, 0.0, 0.0],
+        //         p2: [0.5, 0.5, 0.0, 0.0],
+        //     },
+        //     Triangle {
+        //         p0: [0.0, 0.5, 0.0, 0.0],
+        //         p1: [0.5, 0.5, 0.0, 0.0],
+        //         p2: [0.5, 1.0, 0.0, 0.0],
+        //     },
+        //     Triangle {
+        //         p0: [0.0, -0.5, 0.0, 0.0],
+        //         p1: [-0.5, -0.5, 0.0, 0.0],
+        //         p2: [-0.5, -1.0, 0.0, 0.0],
+        //     },
+        // ];
 
-        let mut test_voxels_list: Vec<Voxel> = Vec::new();
+        // let mut test_voxels_list: Vec<Voxel> = Vec::new();
 
-        let mut test_voxels_array_dda: Vec<VoxelWorldTest> = Vec::new();
+        let capa = 386 * 256 * 386;
+
+        let mut test_voxels_array_dda: Vec<VoxelWorldTest> = Vec::with_capacity(capa);
 
         let mut rng = rand::thread_rng();
 
         let now = Instant::now();
-        for x in 0..100 {
-            for y in 0..100 {
-                for z in 0..100 {
-                    let generate = rng.gen_bool(0.25);
-
-                    let r: f32 = (rng.gen_range(0..255)) as f32 / 255.0;
-                    let g = (rng.gen_range(0..255)) as f32 / 255.0;
-                    let b = (rng.gen_range(0..255)) as f32 / 255.0;
-
-                    // test_voxels_array_dda[x] = VoxelWorldTest { voxel: [
-                    //     r,
-                    //     g,
-                    //     (z * 5) as f32 / 255.0, 
-                    //     generate as u32 as f32
-                        // ] };
-
-                    test_voxels_array_dda.push(VoxelWorldTest { voxel: [
-                        // (x * 5) as f32 / 255.0, 
-                        // (y * 5) as f32 / 255.0, 
-                        // (z * 5) as f32 / 255.0, 
-                        r,
-                        g,
-                        (z * 5) as f32 / 255.0, 
-                        generate as u32 as f32
-                        ] })
-                }
-            }
+        for _i in 0..capa {
+            let generate = rng.gen_bool(0.05);
+            test_voxels_array_dda.push(VoxelWorldTest {
+                voxel: generate as u32,
+            });
         }
+        println!(
+            "====> Generating random blocks : {}",
+            now.elapsed().as_millis()
+        );
+        // for x in 0..386 {
+        //     for y in 0..256 {
+        //         for z in 0..386 {
+        //             let generate = rng.gen_bool(0.03);
+
+        //             let r: f32 = (rng.gen_range(0..255)) as f32 / 255.0;
+        //             let g = (rng.gen_range(0..255)) as f32 / 255.0;
+        //             let b = (rng.gen_range(0..255)) as f32 / 255.0;
+
+        //             test_voxels_array_dda.push(VoxelWorldTest {
+        //                 voxel: generate as u32,
+        //             });
+        //         }
+        //     }
+        // }
         // let then  = Instant::now();
-        println!("====> Elapsed: {}", now.elapsed().as_millis());
         // println!("{:?}", test_voxels_array_dda);
 
-        for _i in 0..500 {
-            let mut rng = rand::thread_rng();
-            let pt = (1000 - rng.gen_range(0..2000)) as f32 * 0.01;
-            let pt2 = (1000 - rng.gen_range(0..2000)) as f32 * 0.01;
-            let pt3 = (1000 - rng.gen_range(0..2000)) as f32 * 0.008;
-
-            test_voxels_list.push(Voxel {
-                min: [-0.5, -0.5, -0.5, 0.0],
-                max: [0.5, 0.5, 0.5, 0.0],
-                pos: [pt, pt2, pt3, 2.0],
-                node_index: 0,
-                _padding: 0,
-            });
-
-            // test_triangles_list.push(Triangle {
-            //     p0: [0.0 + pt, 0.0 + pt2, pt3, 0.0],
-            //     p1: [0.5 + pt, 0.0 + pt2, pt3, 0.0],
-            //     p2: [0.5 + pt, 0.5 + pt2, pt3, 0.0],
-            // });
-        }
-        for x in 0..30 {
-            for z in 0..30 {
-                // for y in 0..30 {
-                    test_voxels_list.push(Voxel {
-                        min: [-0.5, -0.5, -0.5, 0.0],
-                        max: [0.5, 0.5, 0.5, 0.0],
-                        pos: [15.0 - x as f32, 3.0, 15.0 - z as f32, 0.0],
-                        node_index: 0,
-                        _padding: 0,
-                    });
-                // }
-            }
-        }
-
-        let bvh = BVH::build(&mut test_voxels_list);
+        // let bvh = BVH::build(&mut test_voxels_list);
 
         // println!("{}", test_voxels_list[4].node_index);
 
         // let flatten = bvh.flatten();
 
-        let custom_constructor =
-            |aabb: &AABB, entry, exit, shape_index| BvhNodeGpu::new(aabb, entry, exit, shape_index);
+        // let custom_constructor =
+        //     |aabb: &AABB, entry, exit, shape_index| BvhNodeGpu::new(aabb, entry, exit, shape_index);
 
-        let flatten = bvh.flatten_custom(&custom_constructor);
+        // let flatten = bvh.flatten_custom(&custom_constructor);
 
         // for (index, flat) in flatten.iter().enumerate() {
         //     println!(
@@ -270,31 +235,33 @@ impl TracingPipeline {
 
         // exit(0);
 
-        let triangle_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("[Compute Uniform] Buffer"),
-            contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        // let triangle_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        //     label: Some("[Compute Uniform] Buffer"),
+        //     contents: bytemuck::cast_slice(test_triangles_list.as_slice()),
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
-        let voxel_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("[Compute Uniform] Buffer Voxels"),
-            contents: bytemuck::cast_slice(test_voxels_list.as_slice()),
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        // let voxel_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        //     label: Some("[Compute Uniform] Buffer Voxels"),
+        //     contents: bytemuck::cast_slice(test_voxels_list.as_slice()),
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
-        let bvh_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("[Compute Uniform] Buffer BVH"),
-            contents: bytemuck::cast_slice(flatten.as_slice()),
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        // let bvh_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        //     label: Some("[Compute Uniform] Buffer BVH"),
+        //     contents: bytemuck::cast_slice(flatten.as_slice()),
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
+        let start = Instant::now();
         let dda_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("[Compute Uniform] Buffer DDA"),
             contents: bytemuck::cast_slice(test_voxels_array_dda.as_slice()),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
+        println!("Buffer transfer : {}", start.elapsed().as_millis());
 
-        return (triangle_buffer, voxel_buffer, bvh_buffer, dda_buffer);
+        return (dda_buffer, test_voxels_array_dda);
     }
 
     // pub fn uniform_init(device: &Device, uniform: ComputeUniform) -> Buffer {
