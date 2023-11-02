@@ -81,15 +81,63 @@ struct VoxelTraversalHit {
     color: vec3<f32>,
 }
 
+fn intersect_aabb(
+    ray: Ray,
+    position: vec3<f32>,
+) -> f32 {
+    let bmin = vec3<f32>(0.0, 0.0, 0.0) + position;
+    let bmax = vec3<f32>(1.0, 1.0, 1.0) + position;
+
+    let tx1: f32 = (bmin.x - ray.orig.x) * ray.inv_dir.x;
+    let tx2: f32 = (bmax.x - ray.orig.x) * ray.inv_dir.x;
+
+    var tmin: f32 = min(tx1, tx2);
+    var tmax: f32 = max(tx1, tx2);
+
+    let ty1: f32 = (bmin.y - ray.orig.y) * ray.inv_dir.y;
+    let ty2: f32 = (bmax.y - ray.orig.y) * ray.inv_dir.y;
+
+    tmin = max(tmin, min(ty1, ty2));
+    tmax = min(tmax, max(ty1, ty2));
+
+    let tz1: f32 = (bmin.z - ray.orig.z) * ray.inv_dir.z;
+    let tz2: f32 = (bmax.z - ray.orig.z) * ray.inv_dir.z;
+
+    tmin = max(tmin, min(tz1, tz2));
+    tmax = min(tmax, max(tz1, tz2));
+
+    if tmax >= tmin {
+        return tmin;
+    }
+
+    return 0.0;
+
+    // let t0s = (min - ray.orig) * ray.inv_dir;
+    // let t1s = (max - ray.orig) * ray.inv_dir;
+
+    // let tsmaller = min(t0s, t1s);
+    // let tbigger = max(t0s, t1s);
+
+    // let tmin = max(tsmaller[0], max(tsmaller[1], tsmaller[2]));
+    // let tmax = min(tbigger[0], min(tbigger[1], tbigger[2]));
+
+    // if tmin < tmax {
+    //     return tmin;
+    // }
+
+    // return -1.0;
+}
+
+
 fn get_dist(ray: Ray, side: i32, map: vec3<i32>, stepAmount: vec3<i32>) -> f32 {
     var t = 0.0;
 
     if side == 0 {
-        t = (f32(map.x) - ray.orig.x + f32(1 - stepAmount.x) / 2.0) / ray.dir.x;
+        t = (f32(map.x) - ray.orig.x + f32(1 - stepAmount.x) / 2.0) * ray.inv_dir.x;
     } else if side == 1 {
-        t = (f32(map.z) - ray.orig.z + f32(1 - stepAmount.z) / 2.0) / ray.dir.z;
+        t = (f32(map.z) - ray.orig.z + f32(1 - stepAmount.z) / 2.0) * ray.inv_dir.z;
     } else {
-        t = (f32(map.y) - ray.orig.y + f32(1 - stepAmount.y) / 2.0) / ray.dir.y;
+        t = (f32(map.y) - ray.orig.y + f32(1 - stepAmount.y) / 2.0) * ray.inv_dir.y;
     }
 
     return t;
@@ -207,32 +255,30 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
 
         voxel = voxelworld[map.y * 386 * 256 + map.z * 386 + map.x].voxel;
 
-
         // voxelworld[map.y * MAP_WIDTH * MAP_HEIGHT + map.z * MAP_WIDTH + map.x];
     }
+    var t = 0.0;
+    var normal = vec3(0.0);
 
+    if voxel > 0u {
+        t = get_dist(ray, side, map, stepAmount);
+        // t = intersect_aabb(
+        //     ray,
+        //     vec3<f32>(f32(map.x), f32(map.y), f32(map.z))
+        // );
+        normal = get_normal(side, stepAmount);
+    }
 
-    return VoxelTraversalHit(voxel > 0u, get_dist(ray, side, map, stepAmount), get_normal(side, stepAmount), vec3(0.0));
+    return VoxelTraversalHit(
+        voxel > 0u,
+        t,
+        normal,
+        vec3(0.0)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-// fn intersect_aabb(
-//     ray: Ray,
-//     min: vec3<f32>,
-//     max: vec3<f32>,
-// ) -> bool {
-//     let t0s = (min - ray.orig) * ray.inv_dir;
-//     let t1s = (max - ray.orig) * ray.inv_dir;
-
-//     let tsmaller = min(t0s, t1s);
-//     let tbigger = max(t0s, t1s);
-
-//     let tmin = max(tsmaller[0], max(tsmaller[1], tsmaller[2]));
-//     let tmax = min(tbigger[0], min(tbigger[1], tbigger[2]));
-
-//     return (tmin < tmax);
-// }
 
 // fn intersect_cube(
 //     ray: Ray,
@@ -534,8 +580,12 @@ fn raytrace(ray: Ray) -> vec3<f32> {
     let voxelHit = cast_dda(ray, 300);
 
     if voxelHit.has_hit {
-        return (voxelHit.normal * 0.5) + 0.5;
+        // let t = length((ray.dir * voxelHit.t));
+        return vec3((voxelHit.t / 150.0));
+
+        // return (voxelHit.normal * 0.5) + 0.5;
     }
+
     return vec3(0.0, 0.0, 0.0);
 }
 
@@ -639,16 +689,16 @@ fn main(
     var seed: u32 = (u32(screen_pos.x) * (1973u) + u32(screen_pos.y) * (9277u) * (26699u)) | (1u);
     // var seed: u32 = uint rngState = u32(u32(fragCoord.x) * u32(1973) + u32(fragCoord.y) * u32(9277) + u32(iFrame) * u32(26699)) | u32(1);
 
-    // var path_tracing_color = vec3(0.0, 0.0, 0.0);
-    // for (var i = 0; i < MAX_SAMPLES; i++) {
-    //     seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
-    //     seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
-    //     // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
-    //     // wang_hash(&seed);
-    //     path_tracing_color += pathtrace(ray, &seed);
-    // }
-    // path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
-    // textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
+    var path_tracing_color = vec3(0.0, 0.0, 0.0);
+    for (var i = 0; i < MAX_SAMPLES; i++) {
+        seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
+        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+        // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+        // wang_hash(&seed);
+        path_tracing_color += pathtrace(ray, &seed);
+    }
+    path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
+    textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
 
-    textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
+    // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }
