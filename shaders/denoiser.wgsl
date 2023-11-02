@@ -5,12 +5,12 @@
 var color_map: texture_storage_2d<rgba8unorm, read>;
 
 @group(0) @binding(1)
-var normal_map: texture_storage_2d<rgba8unorm, read>;
+var normal_map: texture_storage_2d<rgba8snorm, read>;
+
+// @group(0) @binding(2)
+// var depth_map: texture_storage_2d<rgba8unorm, read>;
 
 @group(0) @binding(2)
-var depth_map: texture_storage_2d<rgba8unorm, read>;
-
-@group(0) @binding(3)
 var output_texture: texture_storage_2d<rgba8unorm, write>;
 
 struct DenoiseSettings {
@@ -64,28 +64,36 @@ fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>,
 ) {
     let screen_pos: vec2<i32> = vec2<i32>(i32(global_id.x), i32(global_id.y));
-    var final_color = vec4(0.0);
+    // var final_color = vec3(0.0);
 
     let tx = vec2<i32>(screen_pos);
 
-    let cval = textureLoad(color_map, tx);
-    let sampleFrame = cval.a;
+    let tex_color = textureLoad(color_map, tx);
+
+    let cval = tex_color.xyz;
+    // let cval = textureLoad(color_map, tx);
+    let sampleFrame = 1.0; //cval.a;
     let sf2 = sampleFrame * sampleFrame;
     let nval = textureLoad(normal_map, tx).xyz;
-    let pval = textureLoad(depth_map, tx).r;
+    // let pval = textureLoad(depth_map, tx).r;
+    let pval = tex_color.z;
 
     var sum = vec3(0.0);
     var cum_w = 0.0;
 
     if isNan(pval) {
-        final_color = cval;
+        // final_color = cval;
+        textureStore(output_texture, screen_pos, vec4(cval, 1.0));
         return;
     }
 
     for (var i = 0; i < KERNEL_SIZE; i++) {
         let uv = tx + OFFSETS[i] * denoiser_setting.step_width;
 
-        let ptmp = textureLoad(depth_map, uv).r;
+        let tex_color = textureLoad(color_map, uv);
+
+        // let ptmp = textureLoad(depth_map, uv).r;
+        let ptmp = tex_color.z;
 
         if isNan(ptmp) {
             continue;
@@ -99,7 +107,8 @@ fn main(
             continue;
         }
 
-        let ctmp = textureLoad(color_map, uv);
+        let ctmp = tex_color.xyz;
+        // let ctmp = textureLoad(color_map, uv);
 
         let t = cval.rgb - ctmp.rgb;
 
@@ -112,5 +121,7 @@ fn main(
         cum_w += weight;
     }
 
-    final_color = vec4(sum / cum_w, sampleFrame);
+    textureStore(output_texture, screen_pos, vec4(sum / cum_w, 1.0));
+
+    // final_color = vec4(sum / cum_w, 1.0);
 }

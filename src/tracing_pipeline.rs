@@ -10,9 +10,10 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
     BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
     ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages,
-    TextureView,
+    Texture, TextureView, TextureFormat,
 };
 
+use crate::init_textures::RenderTexture;
 use crate::structs::{BvhNodeGpu, Camera, Triangle, Voxel, VoxelWorldTest, INTERNAL_H, INTERNAL_W};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
@@ -32,7 +33,7 @@ pub struct TracingPipeline {
 }
 
 impl TracingPipeline {
-    pub fn new(device: &Device, render_texture: &TextureView, camera: Camera) -> TracingPipeline {
+    pub fn new(device: &Device, textures: &RenderTexture, camera: Camera) -> TracingPipeline {
         let (dda_buffer, test_voxels_array_dda) =
             Self::create_triangle_buffer_tmp_todo_remove(device);
 
@@ -60,7 +61,7 @@ impl TracingPipeline {
             .done()
             .build();
 
-        let render_texture_binds = Self::init_bind_render_texture(device, render_texture);
+        let render_texture_binds = Self::init_bind_render_texture(device, textures);
 
         let pipeline = Self::init_pipeline(
             device,
@@ -135,20 +136,33 @@ impl TracingPipeline {
         })
     }
 
-    fn init_bind_render_texture(device: &Device, texture_view: &TextureView) -> BindGroups {
+    fn init_bind_render_texture(device: &Device, textures: &RenderTexture) -> BindGroups {
         BindingGeneratorBuilder::new(device)
-            .with_default_storage_texture(texture_view)
+            .with_default_storage_texture(&textures.render_view)
             .visibility(ShaderStages::COMPUTE)
             .done()
+
+            .with_default_storage_texture(&textures.color_view)
+            .visibility(ShaderStages::COMPUTE)
+            .done()
+
+            .with_storage_texture(&textures.normal_view, TextureFormat::Rgba8Snorm)
+            .visibility(ShaderStages::COMPUTE)
+            .done()
+
+            // .with_default_storage_texture(&textures.depth_view)
+            // .with_storage_texture(&textures.depth_view, TextureFormat::R8Unorm)
+            // .visibility(ShaderStages::COMPUTE)
+            // .done()
             .build()
     }
 
-    fn init_bind_storage(device: &Device, triangle_buffer: &Buffer) -> BindGroups {
-        BindingGeneratorBuilder::new(device)
-            .with_default_buffer_storage(ShaderStages::COMPUTE, triangle_buffer, true)
-            .done()
-            .build()
-    }
+    // fn init_bind_storage(device: &Device, triangle_buffer: &Buffer) -> BindGroups {
+    //     BindingGeneratorBuilder::new(device)
+    //         .with_default_buffer_storage(ShaderStages::COMPUTE, triangle_buffer, true)
+    //         .done()
+    //         .build()
+    // }
 
     fn create_triangle_buffer_tmp_todo_remove(device: &Device) -> (Buffer, Vec<VoxelWorldTest>) {
         // let mut test_triangles_list = vec![

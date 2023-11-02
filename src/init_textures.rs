@@ -1,16 +1,20 @@
-use wgpu::{Device, Texture, TextureDimension, TextureFormat, TextureUsages, TextureView};
+use wgpu::{
+    AddressMode, Device, FilterMode, Sampler, SamplerDescriptor, Texture, TextureDimension,
+    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
+};
 
 use crate::structs::{INTERNAL_H, INTERNAL_W};
 
 pub struct RenderTexture {
     pub render: Texture,
     pub render_view: TextureView,
+    pub render_sanpler: Sampler,
 
-    // pub color: Texture,
-    // pub color_view: TextureView,
+    pub color: Texture,
+    pub color_view: TextureView,
 
-    // pub normal: Texture,
-    // pub normal_view: TextureView,
+    pub normal: Texture,
+    pub normal_view: TextureView,
 
     // pub depth: Texture,
     // pub depth_view: TextureView,
@@ -18,15 +22,55 @@ pub struct RenderTexture {
 
 impl RenderTexture {
     pub fn new(device: &Device) -> Self {
-        let render_texture =
+        let render =
             Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
-        let render_texture_view = render_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let render_view = render.create_view(&TextureViewDescriptor::default());
+        let render_sanpler = Self::create_sampler_helper(device);
 
+        let color =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
+        let color_view = color.create_view(&TextureViewDescriptor::default());
+
+        let normal =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Snorm);
+        let normal_view = normal.create_view(&TextureViewDescriptor{
+          format: Some(TextureFormat::Rgba8Snorm),
+          ..TextureViewDescriptor::default()
+        });
+
+        // let depth =
+        //     Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::r);
+        // let depth_view = normal.create_view(&TextureViewDescriptor{
+        //   format: Some(TextureFormat::r),
+        //   ..TextureViewDescriptor::default()
+        // });
 
         Self {
-          render: render_texture,
-          render_view: render_texture_view,
+            render,
+            render_view,
+            render_sanpler,
+
+            color,
+            color_view,
+
+            normal,
+            normal_view,
+
+            // depth,
+            // depth_view,
         }
+    }
+
+    fn create_sampler_helper(device: &Device) -> Sampler {
+        device.create_sampler(&SamplerDescriptor {
+            address_mode_u: AddressMode::ClampToEdge,
+            address_mode_v: AddressMode::ClampToEdge,
+            address_mode_w: AddressMode::ClampToEdge,
+            mag_filter: FilterMode::Nearest,
+            min_filter: FilterMode::Nearest,
+            mipmap_filter: FilterMode::Nearest,
+            ..Default::default()
+        })
     }
 
     fn create_texture_helper(

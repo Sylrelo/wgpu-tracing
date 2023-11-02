@@ -53,6 +53,12 @@ struct Camera {
 
 @group(0) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(1)
+var tex_color: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(2)
+var tex_normal: texture_storage_2d<rgba8snorm, write>;
+// @group(0) @binding(3)
+// var tex_depth: texture_storage_2d<r32float, write>;
 
 //@group(1) @binding(0)
 //var<uniform> unidata: ComputeUniform;
@@ -589,7 +595,7 @@ fn raytrace(ray: Ray) -> vec3<f32> {
     return vec3(0.0, 0.0, 0.0);
 }
 
-fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
+fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec2<i32>) -> vec3<f32> {
     var throughput: vec3<f32> = vec3(1.0, 1.0, 1.0);
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
     var ray = ray_in;
@@ -616,17 +622,25 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
             color += vec3(1.00, 1.00, 1.00) * throughput;
             break ;
         }
+
+        let normal = voxelHit.normal;
+        let vox_color = normal * 0.5 + 0.5;
+
+        if i == 0 && sample == 0 {
+            textureStore(tex_color, screen_pos, vec4(vox_color.xyz, voxelHit.t / 150.0));
+            textureStore(tex_normal, screen_pos, normal.xyzz);
+        }
+
         let ray_position = ray.orig + ray.dir * voxelHit.t;
 
         // let cube = voxels[hit.tri];
         // let normal = normal_cube(ray_position, cube.pos.xyz, cube.min.xyz, cube.max.xyz);
-        let normal = voxelHit.normal;
         // if hit.tri < 105 {
             // color += vec3(1.0, 1.0, 1.0) * throughput;
         // }
 
         color += vec3(0.0, 0.0, 0.0) * throughput;
-        throughput *= normal * 0.5 + 0.5;
+        throughput *= vox_color;
         // throughput *= vec3(0.2, 0.3, 1.0);
 
         // if (length(ray_position) > 145.0 && i >= 1) {
@@ -695,7 +709,7 @@ fn main(
         seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // wang_hash(&seed);
-        path_tracing_color += pathtrace(ray, &seed);
+        path_tracing_color += pathtrace(ray, &seed, i, screen_pos);
     }
     path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
     textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
