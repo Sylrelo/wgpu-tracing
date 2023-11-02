@@ -588,10 +588,9 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         precalc_ray(&ray);
         maxSteps = 50;
         maxSteps = i32(90.0 / (f32(i) + 1.0));
-        // maxSteps = 80;
+        // maxSteps = 3;
         // ray.inv_dir = 1.0 / ray.dir;
     }
-
     return color;
 }
 

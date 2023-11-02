@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
@@ -420,6 +421,27 @@ fn main() {
     env_logger::init();
 
     println!("Internal resolution : {} x {}", INTERNAL_W, INTERNAL_H);
+
+    // let input_img: Vec<f32> = Vec::new();
+    // let mut filter_output = vec![0.0f32; input_img.len()];
+
+    unsafe {
+        oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_DEFAULT);
+    }
+
+    exit(1);
+
+    // let device = oidn::Device::new();
+    // oidn::RayTracing::new(&device)
+    //     // Optionally add float3 normal and albedo buffers as well.
+    //     .srgb(true)
+    //     .image_dimensions(1280 as usize, 720 as usize)
+    //     .filter(&input_img[..], &mut filter_output[..])
+    //     .expect("Filter config error!");
+
+    // if let Err(e) = device.get_error() {
+    //     println!("Error denosing image: {}", e.1);
+    // }
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
