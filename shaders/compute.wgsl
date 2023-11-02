@@ -639,16 +639,16 @@ fn main(
     var seed: u32 = (u32(screen_pos.x) * (1973u) + u32(screen_pos.y) * (9277u) * (26699u)) | (1u);
     // var seed: u32 = uint rngState = u32(u32(fragCoord.x) * u32(1973) + u32(fragCoord.y) * u32(9277) + u32(iFrame) * u32(26699)) | u32(1);
 
-    var path_tracing_color = vec3(0.0, 0.0, 0.0);
-    for (var i = 0; i < MAX_SAMPLES; i++) {
-        seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
-        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
-        // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
-        // wang_hash(&seed);
-        path_tracing_color += pathtrace(ray, &seed);
-    }
-    path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
-    textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
+    // var path_tracing_color = vec3(0.0, 0.0, 0.0);
+    // for (var i = 0; i < MAX_SAMPLES; i++) {
+    //     seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
+    //     seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+    //     // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+    //     // wang_hash(&seed);
+    //     path_tracing_color += pathtrace(ray, &seed);
+    // }
+    // path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
+    // textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
 
-    // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
+    textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }
