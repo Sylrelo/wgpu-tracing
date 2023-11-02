@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -426,7 +427,34 @@ fn main() {
     // let mut filter_output = vec![0.0f32; input_img.len()];
 
     unsafe {
-        oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_DEFAULT);
+        let device = oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_DEFAULT);
+        oidn2_sys::oidnCommitDevice(device);
+
+        let buff = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
+        let output_buffer = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
+
+        let filter = oidn2_sys::oidnNewFilter(device, CString::new("RT").unwrap().into_raw());
+        oidn2_sys::oidnSetFilterImage(
+            filter,
+            CString::new("output").unwrap().into_raw(),
+            output_buffer,
+            oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
+            1280,
+            720,
+            0,
+            0,
+            0,
+        );
+
+        oidn2_sys::oidnCommitFilter(filter);
+
+        oidn2_sys::oidnExecuteFilter(filter);
+
+        let mut caca = CString::new("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
+
+        oidn2_sys::oidnGetDeviceError(device, &mut caca.as_ptr());
+
+        println!("=> {:?}", caca.as_bytes());
     }
 
     exit(1);
