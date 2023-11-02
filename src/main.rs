@@ -1,16 +1,17 @@
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::path::Path;
 use std::process::exit;
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
 use bvh::aabb::Bounded;
 use bvh::bounding_hierarchy::BHShape;
 use bvh::Point3;
+use image::{GenericImageView, ImageBuffer, RgbImage};
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
 use wgpu::{Device, Label, ShaderModule, TextureFormat};
@@ -427,43 +428,100 @@ fn main() {
     // let mut filter_output = vec![0.0f32; input_img.len()];
 
     unsafe {
-        let device = oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_HIP);
+        let allo = oidn2_sys::oidnGetNumPhysicalDevices();
+
+        println!("{}", allo);
+
+        let device = oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_DEFAULT);
         oidn2_sys::oidnCommitDevice(device);
 
-        let color_buffer = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
-        let output_buffer = oidn2_sys::oidnNewBuffer(device, 1280 * 720 * 3 * 4);
+        let color_buffer = oidn2_sys::oidnNewBuffer(device, 500 * 500 * 3 * 4);
+        let output_buffer = oidn2_sys::oidnNewBuffer(device, 500 * 500 * 3 * 4);
 
         let filter = oidn2_sys::oidnNewFilter(device, CString::new("RT").unwrap().into_raw());
-        oidn2_sys::oidnSetFilterImage(
-            filter,
-            CString::new("output").unwrap().into_raw(),
-            output_buffer,
-            oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
-            1280,
-            720,
-            0,
-            0,
-            0,
-        );
+
+        // oidn2_sys::OIDNQuality_OIDN_QUALITY_BALANCED
+        // oidn2_sys::oidnSetFilterInt(filter, name, value)
+
         oidn2_sys::oidnSetFilterImage(
             filter,
             CString::new("color").unwrap().into_raw(),
             color_buffer,
             oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
-            1280,
-            720,
+            500,
+            500,
             0,
             0,
             0,
         );
+        oidn2_sys::oidnSetFilterImage(
+            filter,
+            CString::new("output").unwrap().into_raw(),
+            output_buffer,
+            oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
+            500,
+            500,
+            0,
+            0,
+            0,
+        );
+        oidn2_sys::oidnSetFilterInt(filter, CString::new("quality").unwrap().into_raw(), 0);
 
         oidn2_sys::oidnCommitFilter(filter);
 
         let pute = oidn2_sys::oidnGetBufferData(color_buffer);
-        let slice = std::slice::from_raw_parts_mut(pute as *mut f32, 1280 * 720 * 3 * 4);
+        let slice = std::slice::from_raw_parts_mut(pute as *mut f32, 500 * 500 * 3 * 4);
 
+        let diffuse_bytes = include_bytes!("tracing.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+
+        let mut i = 0;
+
+        for img in diffuse_image.pixels() {
+            // println!("{} {} {:?} ", img.0, img.1, img.2);
+
+            slice[i] = img.2 .0[0] as f32 / 255.0;
+            slice[i + 1] = img.2 .0[1] as f32 / 255.0;
+            slice[i + 2] = img.2 .0[2] as f32 / 255.0;
+
+            i += 3;
+        }
+
+        println!("{:?} {:?}", pute, color_buffer);
         oidn2_sys::oidnReleaseBuffer(color_buffer);
+
+        // let img2 = image::ImageReader::new(Cursor::new(slice))
+        //     .with_guessed_format()?
+        //     .decode()?;
+
+        // img2.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)?;
+
+        let start = Instant::now();
         oidn2_sys::oidnExecuteFilter(filter);
+        println!("Denoising time : {} ms", start.elapsed().as_millis());
+
+        let output_buffer_data = oidn2_sys::oidnGetBufferData(output_buffer);
+        let output_buffer_ptr =
+            std::slice::from_raw_parts(output_buffer_data as *mut f32, 500 * 500 * 3 * 4);
+
+        // let mut imgbuf: RgbImage = image::ImageBuffer::new(500, 500);
+
+        let mut img_buff: RgbImage = ImageBuffer::new(500, 500);
+
+        // let mut img = ImageBuffer::from_fn(512, 512, |x, y| image::Rgb([1.0, 1.0, 1.0]));
+
+        for (x, y, pixel) in img_buff.enumerate_pixels_mut() {
+            *pixel = image::Rgb([
+                (output_buffer_ptr[(y * 500 + x) as usize * 3] * 255.0) as u8,
+                (output_buffer_ptr[(y * 500 + x) as usize * 3 + 1] * 255.0) as u8,
+                (output_buffer_ptr[(y * 500 + x) as usize * 3 + 2] * 255.0) as u8,
+            ]);
+        }
+
+        img_buff.save("patate.jpg");
+
+        oidn2_sys::oidnReleaseBuffer(output_buffer);
+
         let mut caca = CString::new("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
         oidn2_sys::oidnGetDeviceError(device, &mut caca.as_ptr());
         println!("=> {:?}", caca.as_bytes());
