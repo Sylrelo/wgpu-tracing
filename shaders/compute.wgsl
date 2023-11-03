@@ -139,11 +139,11 @@ fn get_dist(ray: Ray, side: i32, map: vec3<i32>, stepAmount: vec3<i32>) -> f32 {
     var t = 0.0;
 
     if side == 0 {
-        t = (f32(map.x) - ray.orig.x + f32(1 - stepAmount.x) / 2.0) * ray.inv_dir.x;
+        t = (f32(map.x) - ray.orig.x + f32(1 - stepAmount.x) * 0.5) * ray.inv_dir.x;
     } else if side == 1 {
-        t = (f32(map.z) - ray.orig.z + f32(1 - stepAmount.z) / 2.0) * ray.inv_dir.z;
+        t = (f32(map.z) - ray.orig.z + f32(1 - stepAmount.z) * 0.5) * ray.inv_dir.z;
     } else {
-        t = (f32(map.y) - ray.orig.y + f32(1 - stepAmount.y) / 2.0) * ray.inv_dir.y;
+        t = (f32(map.y) - ray.orig.y + f32(1 - stepAmount.y) * 0.5) * ray.inv_dir.y;
     }
 
     return t;
@@ -263,8 +263,8 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
 
         // voxelworld[map.y * MAP_WIDTH * MAP_HEIGHT + map.z * MAP_WIDTH + map.x];
     }
-    var t = 0.0;
     var normal = vec3(0.0);
+    var t = 0.0;
 
     if voxel > 0u {
         t = get_dist(ray, side, map, stepAmount);
@@ -650,9 +650,9 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
         ray.orig = ray_position + normal * 0.0001;
         ray.dir = normalize(RandomUnitVector(seed) + normal);
         precalc_ray(&ray);
-        // maxSteps = 50;
-        maxSteps = i32(90.0 / (f32(i) + 1.0));
-  
+        // maxSteps = 70;
+        maxSteps = i32(115.0 / (f32(i) + 1.0));
+        // maxSteps = 1;
         // maxSteps = 4;
         // maxSteps = 3;
         // ray.inv_dir = 1.0 / ray.dir;

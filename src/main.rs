@@ -15,7 +15,7 @@ use bvh::Point3;
 use image::{GenericImageView, ImageBuffer, RgbImage};
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
-use wgpu::{Device, Label, ShaderModule, TextureFormat, ShaderStages};
+use wgpu::{Device, Label, ShaderModule, ShaderStages, TextureFormat};
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{ElementState, ScanCode, VirtualKeyCode};
 use winit::window::WindowBuilder;
@@ -34,12 +34,13 @@ use crate::structs::{Camera, RenderContext, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline::TracingPipeline;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
+mod denoiser_pipeline;
 mod init_render_pipeline;
+mod init_textures;
 mod init_wgpu;
 mod structs;
 mod tracing_pipeline;
 mod utils;
-mod init_textures;
 
 impl App {
     pub async fn new(window: Window) -> App {
@@ -334,11 +335,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
-                        
+
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                                 store: wgpu::StoreOp::Store,
-                            
                             },
                         })],
                         depth_stencil_attachment: None,
