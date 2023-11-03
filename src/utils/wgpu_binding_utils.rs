@@ -167,6 +167,10 @@ impl<'a> BindingGeneratorBuilder<'a> {
     fn create_entries(&mut self) {
         let index = self.group_layout_entries.len();
 
+        if self.context.binding_resource.is_none() {
+            return;
+        }
+
         self.group_layout_entries.push(BindGroupLayoutEntry {
             binding: index as u32,
             visibility: self.context.visibility,

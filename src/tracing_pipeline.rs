@@ -10,7 +10,7 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
     BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
     ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages,
-    Texture, TextureView, TextureFormat,
+    Texture, TextureFormat, TextureView,
 };
 
 use crate::init_textures::RenderTexture;
@@ -85,7 +85,10 @@ impl TracingPipeline {
     }
 
     pub fn compute_pass(&self, encoder: &mut CommandEncoder) {
-        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor { label: None, timestamp_writes: None});
+        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+            label: None,
+            timestamp_writes: None,
+        });
 
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_bind_group(0, &self.render_texture_binds.bind_group, &[]);
@@ -141,15 +144,16 @@ impl TracingPipeline {
             .with_default_storage_texture(&textures.render_view)
             .visibility(ShaderStages::COMPUTE)
             .done()
-
             .with_default_storage_texture(&textures.color_view)
             .visibility(ShaderStages::COMPUTE)
             .done()
-
-            .with_storage_texture(&textures.normal_view, TextureFormat::Rgba8Snorm)
+            .with_storage_texture(
+                &textures.normal_view,
+                TextureFormat::Rgba8Snorm,
+                wgpu::StorageTextureAccess::WriteOnly,
+            )
             .visibility(ShaderStages::COMPUTE)
             .done()
-
             // .with_default_storage_texture(&textures.depth_view)
             // .with_storage_texture(&textures.depth_view, TextureFormat::R8Unorm)
             // .visibility(ShaderStages::COMPUTE)

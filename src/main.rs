@@ -12,6 +12,7 @@ use std::{thread, time};
 use bvh::aabb::Bounded;
 use bvh::bounding_hierarchy::BHShape;
 use bvh::Point3;
+use denoiser_pipeline::DenoiserPipeline;
 use image::{GenericImageView, ImageBuffer, RgbImage};
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
@@ -117,6 +118,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     ///////////////////////////////////////////////////////////
 
     let tracing_pipeline = TracingPipeline::new(&app.device, &textures, camera);
+    let denoiser_pipeline = DenoiserPipeline::new(&app.device, &textures);
 
     //////////
 

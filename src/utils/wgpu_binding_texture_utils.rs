@@ -1,7 +1,7 @@
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 use wgpu::{
-    BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, TextureFormat,
-    TextureView, TextureViewDimension, Texture,
+    BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, Texture,
+    TextureFormat, TextureView, TextureViewDimension,
 };
 
 impl<'a> BindingGeneratorBuilder<'a> {
@@ -20,8 +20,7 @@ impl<'a> BindingGeneratorBuilder<'a> {
         mut self,
         visibility: ShaderStages,
         texture_view: &'a TextureView,
-
-    ) -> BindingGeneratorBuilder<'a>  {
+    ) -> BindingGeneratorBuilder<'a> {
         self.context.binding_type = BindingType::Texture {
             sample_type: wgpu::TextureSampleType::Float { filterable: false },
             view_dimension: TextureViewDimension::D2,
@@ -57,6 +56,22 @@ impl<'a> BindingGeneratorBuilder<'a> {
         self
     }
 
+    pub fn with_storage_texture(
+        mut self,
+        texture_view: &'a TextureView,
+        format: TextureFormat,
+        access: StorageTextureAccess,
+    ) -> BindingGeneratorBuilder<'a> {
+        self.context.binding_type = BindingType::StorageTexture {
+            access,
+            format,
+            view_dimension: TextureViewDimension::D2,
+        };
+        self.context.set_texture_view(texture_view);
+        self
+    }
+
+    /// @deprecated
     pub fn with_default_storage_texture(
         mut self,
         texture_view: &'a TextureView,
@@ -70,18 +85,17 @@ impl<'a> BindingGeneratorBuilder<'a> {
         self
     }
 
-    pub fn with_storage_texture(
-        mut self,
-        texture_view: &'a TextureView,
-        format: TextureFormat
-    ) -> BindingGeneratorBuilder<'a> {
-        self.context.binding_type = BindingType::StorageTexture {
-            access: StorageTextureAccess::WriteOnly,
-            format,
-            view_dimension: TextureViewDimension::D2,
-        };
-        self.context.set_texture_view(texture_view);
-        self
-
-    }
+    // pub fn with_storage_texture(
+    //     mut self,
+    //     texture_view: &'a TextureView,
+    //     format: TextureFormat,
+    // ) -> BindingGeneratorBuilder<'a> {
+    //     self.context.binding_type = BindingType::StorageTexture {
+    //         access: StorageTextureAccess::WriteOnly,
+    //         format,
+    //         view_dimension: TextureViewDimension::D2,
+    //     };
+    //     self.context.set_texture_view(texture_view);
+    //     self
+    // }
 }
