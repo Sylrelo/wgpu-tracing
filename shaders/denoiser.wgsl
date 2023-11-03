@@ -51,39 +51,83 @@ fn main(
 
     let screen_pos: vec2<i32> = vec2<i32>(i32(global_id.x), i32(global_id.y));
 
-    var cum_w = 0.0;
-    var sum = vec3(0.0);
 
     let step = vec2(1. / 1280., 1. / 720.); // resolution
-    let cval = textureLoad(color_map, screen_pos, 0).rgb;
-    let nval = textureLoad(normal_map, screen_pos, 0).rgb;
 
-    let denoiser_setting = DenoiseSettings(1.0, 0.5, 0.1, 5.5);
+    var denoiser_setting = DenoiseSettings(5.0, 1.0, 0.1, 4.0);
+    var final_color = vec3(0.0);
 
-    for (var i = 0; i < KERNEL_SIZE; i++) {
-        let uv = (vec2<f32>(screen_pos) / vec2(1280.0, 720.0)) + OFFSETS[i] * step * denoiser_setting.step_width;
+    var cval = textureLoad(color_map, screen_pos, 0).rgb;
 
-        let ctmp = textureLoad(color_map, vec2<i32>(uv * vec2(1280.0, 720.0)), 0).rgb;
-        var t = cval - ctmp;
+    for (var e = 0; e < 3; e++) {
+        // denoiser_setting.step_width = pow(2.0, denoiser_setting.step_width);
 
-        var dist2 = dot(t, t);
-        let c_w = min(exp(-(dist2) / denoiser_setting.c_phi), 1.0);
+        var cum_w = 0.0;
+        var sum = vec3(0.0);
+        // let cval = textureLoad(color_map, screen_pos, 0).rgb;
+        let nval = textureLoad(normal_map, screen_pos, 0).xyz;
 
-        let ntmp = textureLoad(normal_map, vec2<i32>(uv * vec2(1280.0, 720.0)), 0).rgb;
+        let sf2 = pow(2.0, f32(e));
 
-        // t = nval - ntmp;
-        // dist2 = max(dot(t, t) / (denoiser_setting.step_width * denoiser_setting.step_width), 0.0);
+        for (var i = 0; i < KERNEL_SIZE; i++) {
+            let uv = screen_pos + vec2<i32>(OFFSETS[i]) * i32(sf2);
+            // let uv1 = (vec2<f32>(screen_pos) / vec2(1280.0, 720.0)) + OFFSETS[i] * sf2;
+            // let uv = vec2<i32>(uv1 * vec2(1280.0, 720.0)) ;
 
-        // let n_w = min(exp(-(dist2) / denoiser_setting.n_phi), 1.0);
+            let ctmp = textureLoad(color_map, uv, 0).rgb;
+            let ntmp = textureLoad(normal_map, uv, 0).xyz;
 
-        let weight = c_w;// * n_w;// * p_w;
-        sum += ctmp * weight * KERNEL[i];
-        cum_w += weight * KERNEL[i];
+            var color_diff = cval.rgb - ctmp.rgb;
+            let c_w = min(exp(-dot(color_diff, color_diff)) / denoiser_setting.c_phi, 1.0);
+
+            let normal_diff = nval - ntmp;
+
+            let normal_d = max(dot(normal_diff, normal_diff) / (sf2 * sf2), 0.0f);
+            let n_w = min(exp(-(normal_d) / denoiser_setting.n_phi), 1.0f);
+
+
+            let weight = c_w * n_w * KERNEL[i];
+
+            sum += ctmp.rgb * weight;
+            cum_w += weight;
+
+            // sum += color_diff;
+        }
+
+        cval = (sum / cum_w);
+        // sum /= 25.0;
+
+        // for (var i = 0; i < KERNEL_SIZE; i++) {
+        //     let uv = (vec2<f32>(screen_pos) / vec2(1280.0, 720.0)) + OFFSETS[i] * step * denoiser_setting.step_width;
+
+        //     let ctmp = textureLoad(color_map, vec2<i32>(uv * vec2(1280.0, 720.0)), 0).rgb;
+        //     var t = cval - ctmp;
+
+        //     var dist2 = dot(t, t);
+        //     let c_w = min(exp(-(dist2) / denoiser_setting.c_phi), 1.0);
+
+        //     let ntmp = textureLoad(normal_map, vec2<i32>(uv * vec2(1280.0, 720.0)), 0).rgb;
+
+        // // t = nval - ntmp;
+        // // dist2 = max(dot(t, t) / (denoiser_setting.step_width * denoiser_setting.step_width), 0.0);
+
+        // // let n_w = min(exp(-(dist2) / denoiser_setting.n_phi), 1.0);
+
+        //     let weight = c_w;// * n_w;// * p_w;
+        //     sum += ctmp * weight * KERNEL[i];
+        //     cum_w += weight * KERNEL[i];
+        // }
+
+        // final_color = sum;
+        final_color += cval;
+        // final_color += ((sum * vec3<f32>(0.2126, 0.7152, 0.0722)) / cum_w);
     }
 
-    if screen_pos.x >= 640 {
+
+
+    if screen_pos.x >= 260 {
         // let nval = textureLoad(normal_map, tx, 0).xyz;
-        textureStore(output_texture, screen_pos, vec4(sum / cum_w, 1.0));
+        textureStore(output_texture, screen_pos, vec4(final_color / 3.0, 1.0));
     }
 
     // let pval = texture2D(posMap, gl_TexCoord[0].st);
