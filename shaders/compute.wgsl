@@ -601,6 +601,9 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
     var ray = ray_in;
 
     var maxSteps = 300;
+
+    var first_t = 0.0;
+
     for (var i = 0; i < 6; i++) {
         // var hit: TriangleHit = TriangleHit(0, false, 0.0);
 
@@ -627,7 +630,8 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
         let vox_color = normal * 0.5 + 0.5;
 
         if i == 0 && sample == 0 {
-            textureStore(tex_color, screen_pos, vec4(vox_color.xyz, voxelHit.t / 150.0));
+
+            first_t = voxelHit.t / 150.0;
             textureStore(tex_normal, screen_pos, normal.xyzz);
         }
 
@@ -657,6 +661,9 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
         // maxSteps = 3;
         // ray.inv_dir = 1.0 / ray.dir;
     }
+
+    textureStore(tex_color, screen_pos, vec4(color.xyz, first_t));
+
     return color;
 }
 

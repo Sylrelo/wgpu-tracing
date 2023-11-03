@@ -34,7 +34,7 @@ fn isNan(val: f32) -> bool {
 fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>,
 ) {
-    let denoiser_setting = DenoiseSettings(0.3, 0.3, 0.3, 3);
+    let denoiser_setting = DenoiseSettings(10.7, 2.2, 0.1, 5);
 
     var OFFSETS = array<vec2<i32>, KERNEL_SIZE>(
         vec2(-2, -2), vec2(-1, -2), vec2(0, -2), vec2(1, -2), vec2(2, -2),
@@ -58,6 +58,13 @@ fn main(
     let tx = vec2<i32>(screen_pos);
 
     let tex_color = textureLoad(color_map, tx, 0);
+
+
+    // textureStore(output_texture, screen_pos, vec4(tex_color.xyz, 1.0));
+
+    // if true {
+    //     return;
+    // }
 
     let cval = tex_color.xyz;
     // let cval = textureLoad(color_map, tx);
@@ -110,7 +117,10 @@ fn main(
         cum_w += weight;
     }
 
-    textureStore(output_texture, screen_pos, vec4(sum / cum_w, 1.0));
+    if screen_pos.x >= 640 {
+        // let nval = textureLoad(normal_map, tx, 0).xyz;
+        textureStore(output_texture, screen_pos, vec4(sum / cum_w, 1.0));
+    }
 
     // final_color = vec4(sum / cum_w, 1.0);
 }

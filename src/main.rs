@@ -329,6 +329,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 tracing_pipeline.compute_pass(&mut encoder);
 
+                denoiser_pipeline.exec_pass(&mut encoder);
+
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
@@ -524,7 +526,8 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_visible(false)
-        .with_inner_size(Size::from(PhysicalSize::new(1920, 1080)))
+        .with_inner_size(Size::from(PhysicalSize::new(1280, 720)))
+        // .with_inner_size(Size::from(PhysicalSize::new(1920, 1080)))
         .build(&event_loop)
         .unwrap();
 
