@@ -53,12 +53,12 @@ impl TracingPipeline {
         let storage_binds = BindingGeneratorBuilder::new(device)
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &triangles_buffer, true)
             // .done()
-            // .with_default_buffer_storage(ShaderStages::COMPUTE, &voxels_buffer, true)
-            // .done()
-            // .with_default_buffer_storage(ShaderStages::COMPUTE, &bvh_buffer, true)
-            // .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &dda_buffer, true)
             .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &bvhb, true)
+            // .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &voxelsb, true)
+            // .done()
             .build();
 
         let render_texture_binds = Self::init_bind_render_texture(device, textures);
@@ -187,17 +187,26 @@ impl TracingPipeline {
         //     },
         // ];
 
-        // let mut test_voxels_list: Vec<Voxel> = Vec::new();
+        let mut test_voxels_list: Vec<Voxel> = Vec::new();
 
         let capa = 386 * 256 * 386;
 
-        let mut test_voxels_array_dda: Vec<VoxelWorldTest> = Vec::with_capacity(capa);
+        let mut test_voxels_array_dda: Vec<VoxelWorldTest> = Vec::new();
 
         let mut rng = rand::thread_rng();
 
         let now = Instant::now();
-        for _i in 0..capa {
-            let generate = rng.gen_bool(0.05);
+        for i in 0..capa {
+            let x = i % 385;
+            let y = (i / 385) % 256;
+            let z = i / (385 * 256);
+            let mut generate = true;
+            let mut generate = rng.gen_bool(0.05);
+
+            if x >= 50 && x <= 300 && z >= 50 && z <= 50 && y >= 50 && y <= 200 {
+                generate = true;
+            }
+
             test_voxels_array_dda.push(VoxelWorldTest {
                 voxel: generate as u32,
             });
@@ -224,16 +233,13 @@ impl TracingPipeline {
         // let then  = Instant::now();
         // println!("{:?}", test_voxels_array_dda);
 
+        // println!("Build BVH");
         // let bvh = BVH::build(&mut test_voxels_list);
-
-        // println!("{}", test_voxels_list[4].node_index);
-
-        // let flatten = bvh.flatten();
-
         // let custom_constructor =
         //     |aabb: &AABB, entry, exit, shape_index| BvhNodeGpu::new(aabb, entry, exit, shape_index);
-
+        // println!("Flatten BVH");
         // let flatten = bvh.flatten_custom(&custom_constructor);
+        // println!("Flatten OK");
 
         // for (index, flat) in flatten.iter().enumerate() {
         //     println!(

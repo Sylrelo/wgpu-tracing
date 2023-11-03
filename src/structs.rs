@@ -1,4 +1,6 @@
-use wgpu::{PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat, Texture, TextureView};
+use wgpu::{
+    PipelineLayout, RenderPipeline, SurfaceCapabilities, Texture, TextureFormat, TextureView,
+};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -33,7 +35,6 @@ pub struct App {
     pub swapchain_config: SwapchainData,
 }
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Camera {
@@ -60,11 +61,9 @@ pub struct Triangle {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Voxel {
-    pub min: [f32; 4],
-    pub max: [f32; 4],
     pub pos: [f32; 4],
     pub node_index: usize,
-    pub _padding: usize,
+    // pub _padding: usize,
 }
 
 #[repr(C)]

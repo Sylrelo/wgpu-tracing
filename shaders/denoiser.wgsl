@@ -54,7 +54,7 @@ fn main(
 
     let step = vec2(1. / 1280., 1. / 720.); // resolution
 
-    var denoiser_setting = DenoiseSettings(0.1, 0.4, 0.1, 4.0);
+    var denoiser_setting = DenoiseSettings(0.1, 0.10, 0.1, 4.0);
     var final_color = vec3(0.0);
 
     var cval = textureLoad(color_map, screen_pos, 0).rgb;

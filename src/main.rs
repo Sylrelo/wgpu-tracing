@@ -94,7 +94,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [25.0, 260.0, 105.5, 0.0],
+        position: [25.0, 130.0, 105.5, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
 
@@ -244,7 +244,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .as_secs();
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
+        *control_flow = ControlFlow::Wait;
 
         let mut app = app.lock().unwrap();
         let tracing_pipeline = tracing_pipeline.lock().unwrap();
@@ -260,22 +260,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 match input.virtual_keycode.unwrap() {
                     VirtualKeyCode::W => {
-                        camera.position[2] -= 0.35;
+                        camera.position[2] -= 1.0;
                     }
                     VirtualKeyCode::S => {
-                        camera.position[2] += 0.35;
+                        camera.position[2] += 1.0;
                     }
                     VirtualKeyCode::A => {
-                        camera.position[0] -= 0.35;
+                        camera.position[0] -= 1.0;
                     }
                     VirtualKeyCode::D => {
-                        camera.position[0] += 0.35;
+                        camera.position[0] += 1.0;
                     }
                     VirtualKeyCode::R => {
-                        camera.position[1] += 0.35;
+                        camera.position[1] += 1.0;
                     }
                     VirtualKeyCode::F => {
-                        camera.position[1] -= 0.35;
+                        camera.position[1] -= 1.0;
                     }
                     _ => (),
                 }
@@ -389,16 +389,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 impl Bounded for Voxel {
     fn aabb(&self) -> bvh::aabb::AABB {
         bvh::aabb::AABB::with_bounds(
-            Point3::new(
-                self.min[0] - self.pos[0],
-                self.min[1] - self.pos[1],
-                self.min[2] - self.pos[2],
-            ),
-            Point3::new(
-                self.max[0] - self.pos[0],
-                self.max[1] - self.pos[1],
-                self.max[2] - self.pos[2],
-            ),
+            Point3::new(0.0 - self.pos[0], 0.0 - self.pos[1], 0.0 - self.pos[2]),
+            Point3::new(1.0 - self.pos[0], 1.0 - self.pos[1], 1.0 - self.pos[2]),
         )
     }
 }

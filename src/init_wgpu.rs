@@ -47,6 +47,7 @@ impl InitWgpu {
                     features: wgpu::Features::empty(),
                     limits: Limits {
                         max_storage_buffer_binding_size: 536870912,
+                        max_buffer_size: 536870912,
                         ..wgpu::Limits::default()
                     },
                 },
