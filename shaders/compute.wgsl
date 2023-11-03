@@ -521,7 +521,6 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
 //     return 0.0;
 // }
 
-const MAX_SAMPLES = 1;
 // var<storage> seed: vec2<f32> = vec2<f32>(0.0, 0.0);
 
 const M_PI = 3.1415926535897932384626433832795;
@@ -587,14 +586,22 @@ fn raytrace(ray: Ray) -> vec3<f32> {
 
     if voxelHit.has_hit {
         // let t = length((ray.dir * voxelHit.t));
-        return vec3((voxelHit.t / 150.0));
+        // return vec3((voxelHit.t / 150.0));
 
-        // return (voxelHit.normal * 0.5) + 0.5;
+
+        let ray_position = ray.orig + ray.dir * voxelHit.t;
+        let sun_position = vec3(50.0, 254.0, 0.0);
+
+        let sun_direction = normalize(sun_position - ray_position);
+        let n_light = max(0.0, dot(voxelHit.normal, sun_direction));
+
+        return ((voxelHit.normal * 0.5) + 0.5) * (vec3(1.0, 1.0, 1.0) * n_light);
     }
 
     return vec3(0.0, 0.0, 0.0);
 }
 
+const MAX_SAMPLES = 2;
 fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec2<i32>) -> vec3<f32> {
     var throughput: vec3<f32> = vec3(1.0, 1.0, 1.0);
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
@@ -622,20 +629,35 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
         // }
 
         if voxelHit.has_hit == false {
-            color += vec3(1.00, 1.00, 1.00) * throughput;
+            color += vec3(0.00, 0.00, 0.00) * throughput;
             break ;
         }
 
         let normal = voxelHit.normal;
-        let vox_color = normal * 0.5 + 0.5;
+        let vox_color = vec3(0.2, 0.2, 1.0);
+        // let vox_color = normal * 0.5 + 0.5;
 
         if i == 0 && sample == 0 {
-
             first_t = voxelHit.t / 150.0;
             textureStore(tex_normal, screen_pos, normal.xyzz);
         }
 
         let ray_position = ray.orig + ray.dir * voxelHit.t;
+
+        ray.orig = ray_position + normal * 0.0001;
+
+        let sun_position = vec3(50.0, 600.0, 0.0);
+        let sun_direction = normalize(sun_position - ray_position);
+        let n_light = max(min(dot(normal, sun_direction), 1.0), 0.0);
+
+        ray.dir = sun_direction;
+        precalc_ray(&ray);
+        let shadow_ray = cast_dda(ray, 150);
+        // if (shadow_ray.has_hitr) 
+        color += max(vec3(0.009, 0.009, 0.009), vec3(1.0, 1.0, 1.0) * (n_light) * f32(!shadow_ray.has_hit)) * throughput;
+        throughput *= vox_color;
+
+        // color += vec3(0.0, 0.0, 0.0) * throughput;
 
         // let cube = voxels[hit.tri];
         // let normal = normal_cube(ray_position, cube.pos.xyz, cube.min.xyz, cube.max.xyz);
@@ -643,20 +665,17 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
             // color += vec3(1.0, 1.0, 1.0) * throughput;
         // }
 
-        color += vec3(0.0, 0.0, 0.0) * throughput;
-        throughput *= vox_color;
         // throughput *= vec3(0.2, 0.3, 1.0);
 
         // if (length(ray_position) > 145.0 && i >= 1) {
         //     break;
         // }
 
-        ray.orig = ray_position + normal * 0.0001;
         ray.dir = normalize(RandomUnitVector(seed) + normal);
         precalc_ray(&ray);
-        // maxSteps = 70;
         maxSteps = i32(115.0 / (f32(i) + 1.0));
-        // maxSteps = 1;
+        // maxSteps = 70;
+        // maxSteps = 4;
         // maxSteps = 4;
         // maxSteps = 3;
         // ray.inv_dir = 1.0 / ray.dir;
@@ -716,9 +735,17 @@ fn main(
         // wang_hash(&seed);
         path_tracing_color += pathtrace(ray, &seed, i, screen_pos);
     }
-    path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
-    textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
-    textureStore(tex_color, screen_pos, vec4(path_tracing_color.xyz, 0.0));
+    path_tracing_color = (path_tracing_color / f32(MAX_SAMPLES));
+
+
+    let gamma = 1.6;
+    let exposure = 1.0;
+
+    var tone_mapping = vec3(1.0) - exp(-path_tracing_color * gamma);
+    tone_mapping = pow(tone_mapping, vec3(1.0 / exposure));
+
+    textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
+    textureStore(tex_color, screen_pos, vec4(tone_mapping.xyz, 0.0));
 
     // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }

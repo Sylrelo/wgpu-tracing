@@ -244,7 +244,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .as_secs();
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::Poll;
 
         let mut app = app.lock().unwrap();
         let tracing_pipeline = tracing_pipeline.lock().unwrap();
@@ -349,7 +349,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 tracing_pipeline.compute_pass(&mut encoder);
 
-                denoiser_pipeline.exec_pass(&mut encoder);
+                // denoiser_pipeline.exec_pass(&mut encoder);
 
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -547,7 +547,7 @@ fn main() {
     let window = WindowBuilder::new()
         .with_visible(false)
         .with_inner_size(Size::from(PhysicalSize::new(1280, 720)))
-        // .with_inner_size(Size::from(PhysicalSize::new(1920, 1080)))
+        .with_inner_size(Size::from(PhysicalSize::new(1920, 1080)))
         .build(&event_loop)
         .unwrap();
 
