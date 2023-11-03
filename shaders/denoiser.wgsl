@@ -17,7 +17,7 @@ struct DenoiseSettings {
     c_phi: f32,
     n_phi: f32,
     p_phi: f32,
-    step_width: i32,
+    step_width: f32,
 }
 
 // @group(1) @binding(0)
@@ -34,14 +34,12 @@ fn isNan(val: f32) -> bool {
 fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>,
 ) {
-    let denoiser_setting = DenoiseSettings(10.7, 2.2, 0.1, 5);
-
-    var OFFSETS = array<vec2<i32>, KERNEL_SIZE>(
-        vec2(-2, -2), vec2(-1, -2), vec2(0, -2), vec2(1, -2), vec2(2, -2),
-        vec2(-2, -1), vec2(-1, -1), vec2(0, -1), vec2(1, -1), vec2(2, -1),
-        vec2(-2, 0), vec2(-1, 0), vec2(0, 0), vec2(1, 0), vec2(2, 0),
-        vec2(-2, 1), vec2(-1, 1), vec2(0, 1), vec2(1, 1), vec2(2, 1),
-        vec2(-2, 2), vec2(-1, 2), vec2(0, 2), vec2(1, 2), vec2(2, 2),
+    var OFFSETS = array<vec2<f32>, KERNEL_SIZE>(
+        vec2(-2.0, -2.0), vec2(-1.0, -2.0), vec2(0.0, -2.0), vec2(1.0, -2.0), vec2(2.0, -2.0),
+        vec2(-2.0, -1.0), vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0), vec2(2.0, -1.0),
+        vec2(-2.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(2.0, 0.0),
+        vec2(-2.0, 1.0), vec2(-1.0, 1.0), vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(2.0, 1.0),
+        vec2(-2.0, 2.0), vec2(-1.0, 2.0), vec2(0.0, 2.0), vec2(1.0, 2.0), vec2(2.0, 2.0),
     );
     var KERNEL = array<f32, KERNEL_SIZE>(
         1.0 / 256.0, 1.0 / 64.0, 3.0 / 128.0, 1.0 / 64.0, 1.0 / 256.0,
@@ -51,70 +49,36 @@ fn main(
         1.0 / 256.0, 1.0 / 64.0, 3.0 / 128.0, 1.0 / 64.0, 1.0 / 256.0,
     );
 
-
     let screen_pos: vec2<i32> = vec2<i32>(i32(global_id.x), i32(global_id.y));
-    // var final_color = vec3(0.0);
 
-    let tx = vec2<i32>(screen_pos);
-
-    let tex_color = textureLoad(color_map, tx, 0);
-
-
-    // textureStore(output_texture, screen_pos, vec4(tex_color.xyz, 1.0));
-
-    // if true {
-    //     return;
-    // }
-
-    let cval = tex_color.xyz;
-    // let cval = textureLoad(color_map, tx);
-    let sampleFrame = 1.0; //cval.a;
-    let sf2 = sampleFrame * sampleFrame;
-    let nval = textureLoad(normal_map, tx, 0).xyz;
-    // let pval = textureLoad(depth_map, tx).r;
-    let pval = tex_color.z;
-
-    var sum = vec3(0.0);
     var cum_w = 0.0;
+    var sum = vec3(0.0);
 
-    if isNan(pval) {
-        // final_color = cval;
-        textureStore(output_texture, screen_pos, vec4(cval, 1.0));
-        return;
-    }
+    let step = vec2(1. / 1280., 1. / 720.); // resolution
+    let cval = textureLoad(color_map, screen_pos, 0).rgb;
+    let nval = textureLoad(normal_map, screen_pos, 0).rgb;
+
+    let denoiser_setting = DenoiseSettings(1.0, 0.5, 0.1, 5.5);
 
     for (var i = 0; i < KERNEL_SIZE; i++) {
-        let uv = tx + OFFSETS[i] * denoiser_setting.step_width;
+        let uv = (vec2<f32>(screen_pos) / vec2(1280.0, 720.0)) + OFFSETS[i] * step * denoiser_setting.step_width;
 
-        let tex_color = textureLoad(color_map, uv, 0);
+        let ctmp = textureLoad(color_map, vec2<i32>(uv * vec2(1280.0, 720.0)), 0).rgb;
+        var t = cval - ctmp;
 
-        // let ptmp = textureLoad(depth_map, uv).r;
-        let ptmp = tex_color.z;
+        var dist2 = dot(t, t);
+        let c_w = min(exp(-(dist2) / denoiser_setting.c_phi), 1.0);
 
-        if isNan(ptmp) {
-            continue;
-        }
+        let ntmp = textureLoad(normal_map, vec2<i32>(uv * vec2(1280.0, 720.0)), 0).rgb;
 
-        let ntmp = textureLoad(normal_map, uv, 0).xyz;
+        // t = nval - ntmp;
+        // dist2 = max(dot(t, t) / (denoiser_setting.step_width * denoiser_setting.step_width), 0.0);
 
-        let n_w = dot(nval, ntmp);
+        // let n_w = min(exp(-(dist2) / denoiser_setting.n_phi), 1.0);
 
-        if n_w < 1E-3 {
-            continue;
-        }
-
-        let ctmp = tex_color.xyz;
-        // let ctmp = textureLoad(color_map, uv);
-
-        let t = cval.rgb - ctmp.rgb;
-
-        let c_w = max(min(1.0 - dot(t, t) / denoiser_setting.c_phi * sf2, 1.0), 0.0);
-        let pt = abs(pval - ptmp);
-        let p_w = max(min(1.0 - pt / denoiser_setting.p_phi, 1.0), 0.0);
-        let weight = c_w * p_w * n_w * KERNEL[i];
-
-        sum += ctmp.rgb * weight;
-        cum_w += weight;
+        let weight = c_w;// * n_w;// * p_w;
+        sum += ctmp * weight * KERNEL[i];
+        cum_w += weight * KERNEL[i];
     }
 
     if screen_pos.x >= 640 {
@@ -122,5 +86,100 @@ fn main(
         textureStore(output_texture, screen_pos, vec4(sum / cum_w, 1.0));
     }
 
-    // final_color = vec4(sum / cum_w, 1.0);
+    // let pval = texture2D(posMap, gl_TexCoord[0].st);
 }
+
+
+// fn main_2(
+//     @builtin(global_invocation_id) global_id: vec3<u32>,
+// ) {
+//     let denoiser_setting = DenoiseSettings(10.7, 2.2, 0.1, 5);
+
+//     var OFFSETS = array<vec2<i32>, KERNEL_SIZE>(
+//         vec2(-2, -2), vec2(-1, -2), vec2(0, -2), vec2(1, -2), vec2(2, -2),
+//         vec2(-2, -1), vec2(-1, -1), vec2(0, -1), vec2(1, -1), vec2(2, -1),
+//         vec2(-2, 0), vec2(-1, 0), vec2(0, 0), vec2(1, 0), vec2(2, 0),
+//         vec2(-2, 1), vec2(-1, 1), vec2(0, 1), vec2(1, 1), vec2(2, 1),
+//         vec2(-2, 2), vec2(-1, 2), vec2(0, 2), vec2(1, 2), vec2(2, 2),
+//     );
+//     var KERNEL = array<f32, KERNEL_SIZE>(
+//         1.0 / 256.0, 1.0 / 64.0, 3.0 / 128.0, 1.0 / 64.0, 1.0 / 256.0,
+//         1.0 / 64.0, 1.0 / 16.0, 3.0 / 32.0, 1.0 / 16.0, 1.0 / 64.0,
+//         3.0 / 128.0, 3.0 / 32.0, 9.0 / 64.0, 3.0 / 32.0, 3.0 / 128.0,
+//         1.0 / 64.0, 1.0 / 16.0, 3.0 / 32.0, 1.0 / 16.0, 1.0 / 64.0,
+//         1.0 / 256.0, 1.0 / 64.0, 3.0 / 128.0, 1.0 / 64.0, 1.0 / 256.0,
+//     );
+
+
+//     let screen_pos: vec2<i32> = vec2<i32>(i32(global_id.x), i32(global_id.y));
+//     // var final_color = vec3(0.0);
+
+//     let tx = vec2<i32>(screen_pos);
+
+//     let tex_color = textureLoad(color_map, tx, 0);
+
+
+//     // textureStore(output_texture, screen_pos, vec4(tex_color.xyz, 1.0));
+
+//     // if true {
+//     //     return;
+//     // }
+
+//     let cval = tex_color.xyz;
+//     // let cval = textureLoad(color_map, tx);
+//     let sampleFrame = 1.0; //cval.a;
+//     let sf2 = sampleFrame * sampleFrame;
+//     let nval = textureLoad(normal_map, tx, 0).xyz;
+//     // let pval = textureLoad(depth_map, tx).r;
+//     let pval = tex_color.z;
+
+//     var sum = vec3(0.0);
+//     var cum_w = 0.0;
+
+//     if isNan(pval) {
+//         // final_color = cval;
+//         textureStore(output_texture, screen_pos, vec4(cval, 1.0));
+//         return;
+//     }
+
+//     for (var i = 0; i < KERNEL_SIZE; i++) {
+//         let uv = tx + OFFSETS[i] * denoiser_setting.step_width;
+
+//         let tex_color = textureLoad(color_map, uv, 0);
+
+//         // let ptmp = textureLoad(depth_map, uv).r;
+//         let ptmp = tex_color.z;
+
+//         if isNan(ptmp) {
+//             continue;
+//         }
+
+//         let ntmp = textureLoad(normal_map, uv, 0).xyz;
+
+//         let n_w = dot(nval, ntmp);
+
+//         if n_w < 1E-3 {
+//             continue;
+//         }
+
+//         let ctmp = tex_color.xyz;
+//         // let ctmp = textureLoad(color_map, uv);
+
+//         let t = cval.rgb - ctmp.rgb;
+
+//         let c_w = max(min(1.0 - dot(t, t) / denoiser_setting.c_phi * sf2, 1.0), 0.0);
+//         let pt = abs(pval - ptmp);
+//         let p_w = max(min(1.0 - pt / denoiser_setting.p_phi, 1.0), 0.0);
+//         let weight = c_w * p_w * n_w * KERNEL[i];
+
+//         sum += ctmp.rgb * weight;
+//         cum_w += weight;
+//     }
+
+//     if screen_pos.x >= 640 {
+//         // let nval = textureLoad(normal_map, tx, 0).xyz;
+//         textureStore(output_texture, screen_pos, vec4(sum / cum_w, 1.0));
+//     }
+
+//     // final_color = vec4(sum / cum_w, 1.0);
+// }
