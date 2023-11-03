@@ -449,7 +449,7 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
 //     var dist = 1000000.0;
 //     var index = 0;
 //     var has_hit = false;
-//     let tot = i32(arrayLength(&voxels));
+//     let tot = i32(arrayLength(&voxels));8
 
 //     for (var i = 0; i < tot; i++) {
 //         let current_triangle = voxels[i];
@@ -521,7 +521,7 @@ fn cast_dda(ray: Ray, maxSteps: i32) -> VoxelTraversalHit {
 //     return 0.0;
 // }
 
-const MAX_SAMPLES = 2;
+const MAX_SAMPLES = 1;
 // var<storage> seed: vec2<f32> = vec2<f32>(0.0, 0.0);
 
 const M_PI = 3.1415926535897932384626433832795;
@@ -662,8 +662,6 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, sample: i32, screen_pos: vec
         // ray.inv_dir = 1.0 / ray.dir;
     }
 
-    textureStore(tex_color, screen_pos, vec4(color.xyz, first_t));
-
     return color;
 }
 
@@ -720,6 +718,7 @@ fn main(
     }
     path_tracing_color = path_tracing_color / f32(MAX_SAMPLES);
     textureStore(color_output, screen_pos, vec4(path_tracing_color.xyz, 1.0));
+    textureStore(tex_color, screen_pos, vec4(path_tracing_color.xyz, 0.0));
 
     // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }

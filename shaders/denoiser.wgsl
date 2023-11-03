@@ -54,12 +54,14 @@ fn main(
 
     let step = vec2(1. / 1280., 1. / 720.); // resolution
 
-    var denoiser_setting = DenoiseSettings(5.0, 1.0, 0.1, 4.0);
+    var denoiser_setting = DenoiseSettings(0.4, 0.4, 0.1, 4.0);
     var final_color = vec3(0.0);
 
     var cval = textureLoad(color_map, screen_pos, 0).rgb;
 
-    for (var e = 0; e < 3; e++) {
+    let max_sample = 3;
+
+    for (var e = 0; e < max_sample; e++) {
         // denoiser_setting.step_width = pow(2.0, denoiser_setting.step_width);
 
         var cum_w = 0.0;
@@ -86,6 +88,7 @@ fn main(
             let n_w = min(exp(-(normal_d) / denoiser_setting.n_phi), 1.0f);
 
 
+            // let weight = c_w * KERNEL[i];
             let weight = c_w * n_w * KERNEL[i];
 
             sum += ctmp.rgb * weight;
@@ -125,9 +128,9 @@ fn main(
 
 
 
-    if screen_pos.x >= 260 {
+    if screen_pos.x >= 480 {
         // let nval = textureLoad(normal_map, tx, 0).xyz;
-        textureStore(output_texture, screen_pos, vec4(final_color / 3.0, 1.0));
+        textureStore(output_texture, screen_pos, vec4(final_color / f32(max_sample), 1.0));
     }
 
     // let pval = texture2D(posMap, gl_TexCoord[0].st);

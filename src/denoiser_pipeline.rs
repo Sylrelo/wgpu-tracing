@@ -62,9 +62,10 @@ impl DenoiserPipeline {
             .build()
     }
 
-    // pub fn recreate_pipeline(&mut self, device: &Device) {
-    //     self.pipeline = Self::init_pipeline(device, &self.bind_groups, &self.shader_module)
-    // }
+    pub fn recreate_pipeline(&mut self, device: &Device, shader_module: ShaderModule) {
+        self.pipeline = Self::init_pipeline(device, &self.bind_groups, &self.shader_module);
+        self.shader_module = shader_module;
+    }
 
     pub fn exec_pass(&self, encoder: &mut CommandEncoder) {
         let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
