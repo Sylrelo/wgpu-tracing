@@ -12,6 +12,15 @@ use crate::{
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
 };
 
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct TracingPipelineSettings {
+    pub player_position: [f32; 4],
+    pub chunk_count: u32,
+    pub _padding: u32,
+}
+
 pub struct TracingPipelineBindGroups {
     pub textures: BindGroups,
     pub uniforms: BindGroups,
@@ -42,7 +51,7 @@ impl TracingPipelineTest {
     pub fn new(device: &Device, textures: &RenderTexture) -> Self {
 
         println!("Init TracingPipelineTest");
-        
+
         let buffers = Self::create_buffers(device);
 
         let bind_groups = TracingPipelineBindGroups {
@@ -80,6 +89,24 @@ impl TracingPipelineTest {
         compute_pass.set_bind_group(2, &self.bind_groups.textures.bind_group, &[]);
         compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 16, 1);
     }
+
+    pub fn chunks_buffer_update(&self, queue: &Queue, chunks: &Vec<[f32; 4]>) {
+        queue.write_buffer(
+            &self.buffers.chunks,
+            0,
+            bytemuck::cast_slice(chunks.as_slice())
+        );
+    }
+
+    pub fn uniform_settings_update(&self, queue: &Queue, settings: TracingPipelineSettings) {
+        queue.write_buffer(
+            &self.buffers.uniform,
+            0,
+            bytemuck::cast_slice(&[settings])
+        );
+    }
+
+    // ===============================
 
     fn get_shader_module(device: &Device) -> ShaderModule {
         device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -149,29 +176,29 @@ impl TracingPipelineTest {
         let uniform = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Uniform Buffer"),
             mapped_at_creation: false,
-            size: 16,
-            usage: BufferUsages::UNIFORM,
+            size: 32,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
         let chunk_content = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunk Content Buffer"),
             mapped_at_creation: false,
             size: 900 * 4,
-            usage: BufferUsages::STORAGE,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
         let chunks = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
             mapped_at_creation: false,
             size: 900 * 4,
-            usage: BufferUsages::STORAGE,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
         TracingPipelineBuffers {
             chunk_content,
             chunk_content_size: 900 * 4,
             chunks,
-            chunks_size: 900 * 4,
+            chunks_size: 300 * 8,
             uniform,
         }
     }

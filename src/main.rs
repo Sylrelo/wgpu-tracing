@@ -35,6 +35,7 @@ use crate::init_textures::RenderTexture;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{Camera, RenderContext, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline::TracingPipeline;
+use crate::tracing_pipeline_new::TracingPipelineSettings;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
 mod chunk_generator;
@@ -129,6 +130,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let denoiser_pipeline = Arc::new(Mutex::new(DenoiserPipeline::new(&app.device, &textures)));
 
     let tracing_pipeline_new = TracingPipelineTest::new(&app.device, &textures);
+
+    let mut chunks = Chunk::init();
     //////////
 
     let shader = app
@@ -314,6 +317,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
+
+                    chunks.generate_around(camera.position);
+
+                    tracing_pipeline_new.uniform_settings_update(
+                        &app.queue, 
+                        TracingPipelineSettings{
+                           chunk_count: chunks.generated_chunks_gpu.len() as u32,
+                           player_position: camera.position,
+                           _padding: 0,
+                    });
+                    
+                    tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+
                     println!("FPS: {}", fps);
                     fps = 0;
                     last_time = curr;

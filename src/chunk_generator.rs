@@ -8,6 +8,11 @@ const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
+const CHUNK_RADIUS: i32 = 2;
+
+// pub struct ChunksAabbGpu {
+//     position: [f32; 4],
+// }
 
 #[allow(dead_code, unused_variables)]
 pub struct Chunk {
@@ -17,6 +22,7 @@ pub struct Chunk {
     // chunks: Vec<[i32; 4]>,
 
     generated_chunks: HashMap<[i32; 4], usize>,
+    pub generated_chunks_gpu: Vec<[f32; 4]>,
 
     chunks_mem: Vec<u32>,
     chunks_mem_free: Vec<usize>,
@@ -32,6 +38,7 @@ impl Chunk {
             // voxels: Vec::new(),
 
             generated_chunks: HashMap::new(),
+            generated_chunks_gpu: Vec::new(),
 
             chunks_mem: Vec::new(),
             chunks_mem_free: Vec::new(),
@@ -46,6 +53,8 @@ impl Chunk {
                 PERMTABLE = Some(PermutationTable::new(0));
             }
         }
+
+        // self.generated_chunks.iter().
         // let chunk_offset = self.chunks_mem.len();
 
         // self.chunks_mem.resize(chunk_offset + CHUNK_TSIZE, 0);
@@ -55,12 +64,12 @@ impl Chunk {
         self.generated_chunks
             .insert(position, chunk_offset / CHUNK_TSIZE);
 
-        println!("Generating {:?}", position);
-        println!(
-            " - Offset {:?} | Index_offset {:?}",
-            chunk_offset,
-            chunk_offset / CHUNK_TSIZE
-        );
+        // println!("Generating {:?}", position);
+        // println!(
+        //     " - Offset {:?} | Index_offset {:?}",
+        //     chunk_offset,
+        //     chunk_offset / CHUNK_TSIZE
+        // );
 
         for x in 0..CHUNK_X {
             // for y in 0..256 {
@@ -88,28 +97,37 @@ impl Chunk {
 
         self.chunk_to_upload.insert(chunk_offset / CHUNK_TSIZE);
 
-        println!("Chunks to GPU-Update {}", self.chunk_to_upload.len());
+        // println!("Chunks to GPU-Update {}", self.chunk_to_upload.len());
 
     }
 
     pub fn generate_around(&mut self, player_pos: [f32; 4]) {
-        for x in player_pos[0] as i32 - 15..player_pos[0] as i32 + 15 {
-            for z in player_pos[2] as i32 - 15..player_pos[2] as i32 + 15 {
+        let mut generated_count = 0;
+
+        for x in player_pos[0] as i32 - CHUNK_RADIUS..player_pos[0] as i32 + CHUNK_RADIUS {
+            for z in player_pos[2] as i32 - CHUNK_RADIUS..player_pos[2] as i32 + CHUNK_RADIUS {
                 let pos = [x as i32, 0, z as i32, 0];
 
                 if self.generated_chunks.contains_key(&pos) == true {
                     continue;
                 }
 
+                generated_count += 1;
                 self.new(pos)
             }
         }
 
-        println!("=> {}", self.chunks_mem_free.len());
+        if generated_count > 0 {
+            println!("=> Generated chunks {}. New Total : {}",generated_count, self.generated_chunks.len());
+        }
+
 
         // self.generated_chunks.
 
         // println!("{:?}", self.voxels.len());
+        // return ;
+
+        let mut unloaded_chunks = 0;
 
         let farthest_chunks = self.clean_farthest_chunk(player_pos, 25.);
         for chunk in farthest_chunks {
@@ -122,7 +140,24 @@ impl Chunk {
 
             self.chunks_mem_free.push(chunk_offset_id);
             self.generated_chunks.remove(&chunk);
+            unloaded_chunks += 1;
+
         }
+
+        if unloaded_chunks > 0 {
+            println!("Unloaded chunks : {}. New Total : {}", unloaded_chunks, self.generated_chunks.len());
+        }
+
+        self.generated_chunks_gpu.clear();
+        for chunk in &self.generated_chunks {
+            self.generated_chunks_gpu.push([
+                chunk.0[0] as f32,
+                0.0,
+                chunk.0[2] as f32,
+                1.0,
+            ]);
+        }
+        // println!("{:?}", self.generated_chunks_gpu);
 
         // for (index, value) in self.chunks_mem.iter().enumerate() {
         //     print!("{}", value);
@@ -131,18 +166,20 @@ impl Chunk {
         //     }
         // }
 
-        println!("=> {}", self.chunks_mem_free.len());
+        // println!("=> {}", self.chunks_mem_free.len());
 
-        for free in &self.chunks_mem_free {
-            println!(
-                "{:4} | {:10} - {}",
-                free,
-                free * CHUNK_TSIZE,
-                (free + 1) * CHUNK_TSIZE
-            );
-        }
+        // for free in &self.chunks_mem_free {
+        //     println!(
+        //         "{:4} | {:10} - {}",
+        //         free,
+        //         free * CHUNK_TSIZE,
+        //         (free + 1) * CHUNK_TSIZE
+        //     );
+        // }
 
         // self.clean_farthest_chunk(player_pos, 19.);
+
+
     }
 
     pub fn get_free_chunk_memory_zone(&mut self) -> usize {
@@ -153,7 +190,7 @@ impl Chunk {
         }
         let free_zone = self.chunks_mem_free.pop().unwrap() * CHUNK_TSIZE;
 
-        println!("Reusing available zone : {}", free_zone);
+        // println!("Reusing available zone : {}", free_zone);
         return free_zone;
     }
 
@@ -163,6 +200,8 @@ impl Chunk {
         for chunk in &self.generated_chunks {
             let dist = Self::get_chunk_distance(player_pos, chunk.0);
 
+            // println!("{}", dist);
+
             if dist < max_dist {
                 continue;
             }
@@ -170,7 +209,7 @@ impl Chunk {
             fartest_chunks.push(chunk.0.clone());
         }
 
-        println!("Chunk too far count : {}", fartest_chunks.len());
+        // println!("Chunk too far count : {}", fartest_chunks.len());
 
         return fartest_chunks;
     }
@@ -178,13 +217,14 @@ impl Chunk {
     fn get_chunk_distance(player_pos: [f32; 4], chunk_pos: &[i32; 4]) -> f32 {
         let v: [f32; 4] = [
             player_pos[0] - chunk_pos[0] as f32,
-            player_pos[1] - chunk_pos[1] as f32,
+            0.0,
             player_pos[2] - chunk_pos[2] as f32,
             0.0,
         ];
 
-        let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        let len = (v[0] * v[0] + v[2] * v[2]).sqrt();
 
+        // println!("{:?} {:?} {}", player_pos, chunk_pos, len);
         return len;
     }
 }

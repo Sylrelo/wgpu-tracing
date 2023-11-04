@@ -2,6 +2,8 @@
 
 struct Settings {
     position: vec4<f32>,
+    chunk_count: u32,
+    _padding: u32,
 }
 
 struct Ray {
@@ -25,7 +27,7 @@ var<uniform> settings: Settings;
 var<storage> chunk_content: array<u32>;
 
 @group(1) @binding(1)
-var<storage> chunks: array<u32>;
+var<storage> chunks: array<vec4<f32>>;
 
 @group(2) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
@@ -41,7 +43,23 @@ const M_TWOPI = 6.28318530718;
 // ===========================================================
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
-  return vec3(0.05, 0.05, 0.10);
+
+//     let len = arrayLength(&chunks);
+//     var real_len = 0u;
+
+//     for (var i = 0u; i < len; i++) {
+//         if chunks[i][3] > 0.0 {
+//             real_len += 1u;
+//         }
+//     }
+
+  return vec3(
+    f32(settings.chunk_count) / 300.0,
+    f32(settings.chunk_count) / 300.0,
+    0.10
+    );
+
+//   return vec3(0.05, 0.05, 0.10);
 }
 
 
