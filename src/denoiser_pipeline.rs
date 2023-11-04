@@ -1,9 +1,9 @@
-use std::{borrow::Cow, rc::Rc};
+use std::borrow::Cow;
 
 use wgpu::{
-    BindGroupLayout, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages,
-    StorageTextureAccess, TextureFormat,
+    CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
+    Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages, StorageTextureAccess,
+    TextureFormat,
 };
 
 use crate::{
@@ -22,6 +22,7 @@ pub struct DenoiserPipeline {
     pub shader_module: ShaderModule,
 }
 
+#[allow(dead_code)]
 impl DenoiserPipeline {
     pub fn new(device: &Device, textures: &RenderTexture) -> Self {
         let texture_bind_groups: BindGroups = Self::create_textures_bind_groups(device, textures);

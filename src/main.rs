@@ -1,24 +1,23 @@
 use std::borrow::Cow;
-use std::ffi::{CStr, CString};
+
 use std::fs::File;
-use std::io::{Cursor, Read};
-use std::num::NonZeroU64;
+use std::io::Read;
+
 use std::path::Path;
-use std::process::exit;
+
 use std::sync::{Arc, Mutex};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
 use bvh::aabb::Bounded;
 use bvh::bounding_hierarchy::BHShape;
 use bvh::Point3;
 use denoiser_pipeline::DenoiserPipeline;
-use image::{GenericImageView, ImageBuffer, RgbImage};
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
-use wgpu::{Device, Label, ShaderModule, ShaderStages, TextureFormat};
+use wgpu::{Device, Label, ShaderModule};
 use winit::dpi::{PhysicalSize, Size};
-use winit::event::{ElementState, ScanCode, VirtualKeyCode};
+use winit::event::{ElementState, VirtualKeyCode};
 use winit::window::WindowBuilder;
 use winit::{
     event::{Event, WindowEvent},
@@ -35,6 +34,7 @@ use crate::structs::{Camera, RenderContext, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline::TracingPipeline;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
+mod chunk_generator;
 mod denoiser_pipeline;
 mod init_render_pipeline;
 mod init_textures;
@@ -248,7 +248,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         let mut app = app.lock().unwrap();
         let tracing_pipeline = tracing_pipeline.lock().unwrap();
-        let denoiser_pipeline = denoiser_pipeline.lock().unwrap();
+        let _denoiser_pipeline = denoiser_pipeline.lock().unwrap();
         match event {
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },

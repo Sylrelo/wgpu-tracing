@@ -1,6 +1,4 @@
-use wgpu::{
-    PipelineLayout, RenderPipeline, SurfaceCapabilities, Texture, TextureFormat, TextureView,
-};
+use wgpu::{PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -84,6 +82,7 @@ pub struct BvhNodeGpu {
     pub _padding: u32,
 }
 
+#[allow(dead_code)]
 impl BvhNodeGpu {
     pub fn new(
         aabb: &bvh::aabb::AABB,

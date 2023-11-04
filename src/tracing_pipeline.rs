@@ -1,20 +1,17 @@
 use std::borrow::Cow;
-use std::process::exit;
+
 use std::time::Instant;
 
-use bvh::aabb::AABB;
-use bvh::bvh::BVH;
-use image::flat;
 use rand::Rng;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
     BindGroupLayout, Buffer, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
     ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages,
-    Texture, TextureFormat, TextureView,
+    TextureFormat,
 };
 
 use crate::init_textures::RenderTexture;
-use crate::structs::{BvhNodeGpu, Camera, Triangle, Voxel, VoxelWorldTest, INTERNAL_H, INTERNAL_W};
+use crate::structs::{Camera, Voxel, VoxelWorldTest, INTERNAL_H, INTERNAL_W};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
 pub struct TracingPipeline {
@@ -39,14 +36,14 @@ impl TracingPipeline {
 
         // let storage_binds = Self::init_bind_storage(device, &triangles_buffer);
 
-        let cameraUniformBuffer = device.create_buffer_init(&BufferInitDescriptor {
+        let camera_uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("[Compute Uniform] Buffer"),
             contents: bytemuck::cast_slice(&[camera]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
         let uniform_binds = BindingGeneratorBuilder::new(device)
-            .with_default_buffer_uniform(ShaderStages::COMPUTE, &cameraUniformBuffer)
+            .with_default_buffer_uniform(ShaderStages::COMPUTE, &camera_uniform_buffer)
             .done()
             .build();
 
@@ -77,7 +74,7 @@ impl TracingPipeline {
             render_texture_binds,
             uniform_binds: uniform_binds,
             storage_binds,
-            uniform_buffer: cameraUniformBuffer,
+            uniform_buffer: camera_uniform_buffer,
             grid_buffer: dda_buffer,
             test_voxels_array_dda: test_voxels_array_dda, // triangles_buffer,
                                                           // voxels_buffer,
@@ -187,7 +184,7 @@ impl TracingPipeline {
         //     },
         // ];
 
-        let mut test_voxels_list: Vec<Voxel> = Vec::new();
+        let _test_voxels_list: Vec<Voxel> = Vec::new();
 
         let capa = 386 * 256 * 386;
 
@@ -200,7 +197,7 @@ impl TracingPipeline {
             let x = i % 385;
             let y = (i / 385) % 256;
             let z = i / (385 * 256);
-            let mut generate = true;
+            let _generate = true;
             let mut generate = rng.gen_bool(0.05);
 
             if x >= 50 && x <= 300 && z >= 50 && z <= 50 && y >= 50 && y <= 200 {

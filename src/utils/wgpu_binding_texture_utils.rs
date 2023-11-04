@@ -1,6 +1,6 @@
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 use wgpu::{
-    BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, Texture,
+    BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess,
     TextureFormat, TextureView, TextureViewDimension,
 };
 
