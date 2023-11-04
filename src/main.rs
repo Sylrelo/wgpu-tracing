@@ -5,6 +5,7 @@ use std::io::Read;
 
 use std::path::Path;
 
+use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
@@ -28,6 +29,7 @@ use winit::{
 use log::{error, info};
 use structs::{App, SwapchainData, Voxel};
 
+use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{Camera, RenderContext, INTERNAL_H, INTERNAL_W};
@@ -417,6 +419,16 @@ fn main() {
     env_logger::init();
 
     println!("Internal resolution : {} x {}", INTERNAL_W, INTERNAL_H);
+
+    let mut chunks = Chunk::init();
+
+    // chunks.new([0, 0, 0, 0]);
+
+    chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
+
+    chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
+
+    exit(1);
 
     // let input_img: Vec<f32> = Vec::new();
     // let mut filter_output = vec![0.0f32; input_img.len()];
