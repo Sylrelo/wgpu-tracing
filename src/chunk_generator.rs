@@ -12,26 +12,31 @@ const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
 #[allow(dead_code, unused_variables)]
 pub struct Chunk {
     // position: [i32; 4],
-    voxels: Vec<[u32; CHUNK_TSIZE]>,
+    // voxels: Vec<[u32; CHUNK_TSIZE]>,
 
-    chunks: Vec<[i32; 4]>,
+    // chunks: Vec<[i32; 4]>,
 
     generated_chunks: HashMap<[i32; 4], usize>,
 
     chunks_mem: Vec<u32>,
     chunks_mem_free: Vec<usize>,
+
+    chunk_to_upload: HashSet<usize>,
 }
 
 #[allow(dead_code, unused_variables)]
 impl Chunk {
     pub fn init() -> Self {
         Self {
-            chunks: Vec::new(),
-            voxels: Vec::new(),
+            // chunks: Vec::new(),
+            // voxels: Vec::new(),
 
             generated_chunks: HashMap::new(),
+
             chunks_mem: Vec::new(),
             chunks_mem_free: Vec::new(),
+
+            chunk_to_upload: HashSet::new()
         }
     }
 
@@ -80,6 +85,11 @@ impl Chunk {
             }
             // }
         }
+
+        self.chunk_to_upload.insert(chunk_offset / CHUNK_TSIZE);
+
+        println!("Chunks to GPU-Update {}", self.chunk_to_upload.len());
+
     }
 
     pub fn generate_around(&mut self, player_pos: [f32; 4]) {
@@ -101,7 +111,7 @@ impl Chunk {
 
         // println!("{:?}", self.voxels.len());
 
-        let farthest_chunks = self.clean_farthest_chunk(player_pos, 19.);
+        let farthest_chunks = self.clean_farthest_chunk(player_pos, 25.);
         for chunk in farthest_chunks {
             let gen_chunk = self.generated_chunks.get(&chunk);
             let chunk_offset_id = gen_chunk.unwrap().clone();

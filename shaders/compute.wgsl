@@ -23,7 +23,6 @@ struct BvhNodeGpu {
     _padding: u32,
 }
 
-
 struct TriangleHit {
     tri: i32,
     has_hit: bool,
