@@ -183,14 +183,14 @@ impl TracingPipelineTest {
         let chunk_content = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunk Content Buffer"),
             mapped_at_creation: false,
-            size: 900 * 4,
+            size: 1900 * 4,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
         let chunks = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
             mapped_at_creation: false,
-            size: 900 * 4,
+            size: 1600 * 8,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 

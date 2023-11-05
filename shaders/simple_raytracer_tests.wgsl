@@ -42,8 +42,66 @@ const M_TWOPI = 6.28318530718;
 
 // ===========================================================
 
+fn sdf_box(ray_pos: vec3<f32>) -> f32 {
+    let b = vec3(32.0, 1.0, 32.0);
+    let p = abs(ray_pos) - b;
+
+     let q = abs(p) - b;
+    return length(max(q, vec3(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
+
+    let e = 0.5;
+    let b = vec3(36.0, 256.0, 36.0);
+    let p = abs(ray_pos) - b;
+    let q = abs(p + e) - e;
+
+    return min(min(
+      length(max(vec3(p.x,q.y,q.z), vec3(0.0)))+min(max(p.x,max(q.y,q.z)),0.0),
+      length(max(vec3(q.x,p.y,q.z), vec3(0.0)))+min(max(q.x,max(p.y,q.z)),0.0)),
+      length(max(vec3(q.x,q.y,p.z), vec3(0.0)))+min(max(q.x,max(q.y,p.z)),0.0));
+
+}
 fn raytrace(ray_in: Ray) -> vec3<f32> {
 
+    var total_dist = 0.0;
+
+    for (var steps = 0; steps < 64; steps++) {
+        // var
+
+        let pos = ray_in.orig + ray_in.dir * total_dist;
+
+        var chk_dst = 10000000.0;
+        for (var chunk_id = 0u; chunk_id < settings.chunk_count; chunk_id++) {
+
+            let chunk_pos = chunks[chunk_id].xyz * vec3(36.0, 1.0, 36.0);
+            let t = sdf_box_sides(chunk_pos - pos);
+
+            if t > 0.0 && t < chk_dst {
+                chk_dst = t;
+            }
+        }   
+
+        if chk_dst >= 10000000.0 {
+            break;
+        }
+
+        // chk_dst = sdf_box_sides(pos - vec3(0.0, 0.0, 10.0));
+
+        if chk_dst < 0.1 {
+            return vec3(0.2, 0.2, 0.5);
+        }
+
+
+        if total_dist > 500.0 {
+            return vec3(0.05, 0.0, 0.0);
+            // break;
+        }
+
+        total_dist += chk_dst;
+
+    }
 //     let len = arrayLength(&chunks);
 //     var real_len = 0u;
 
@@ -54,9 +112,9 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
 //     }
 
   return vec3(
-    f32(settings.chunk_count) / 300.0,
-    f32(settings.chunk_count) / 300.0,
-    0.10
+    0.05,
+    0.05,
+    0.05
     );
 
 //   return vec3(0.05, 0.05, 0.10);

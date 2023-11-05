@@ -99,7 +99,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [25.0, 130.0, 105.5, 0.0],
+        position: [0.0, 259.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
 
@@ -294,6 +294,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 //     bytemuck::cast_slice(&[camera]),
                 // );
 
+                chunks.generate_around(camera.position);
+
+                tracing_pipeline_new.uniform_settings_update(
+                    &app.queue, 
+                    TracingPipelineSettings{
+                       chunk_count: chunks.generated_chunks_gpu.len() as u32,
+                       player_position: camera.position,
+                       _padding: 0,
+                });
+                
+                tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+
                 // println!("{} Hello mofo", input.scancode);
             }
 
@@ -318,17 +330,21 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 if curr - last_time >= 1 {
 
-                    chunks.generate_around(camera.position);
+                    println!("Camera {:?}", camera.position);
 
-                    tracing_pipeline_new.uniform_settings_update(
-                        &app.queue, 
-                        TracingPipelineSettings{
-                           chunk_count: chunks.generated_chunks_gpu.len() as u32,
-                           player_position: camera.position,
-                           _padding: 0,
-                    });
+
+                    // tracing_pipeline_new.uniform_settings_update(
+                    //     &app.queue, 
+                    //     TracingPipelineSettings{
+                    //        chunk_count: chunks.generated_chunks_gpu.len() as u32,
+                    //        player_position: camera.position,
+                    //        _padding: 0,
+                    // });
                     
-                    tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+
+                    // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+
+                    // app.queue.submit();
 
                     println!("FPS: {}", fps);
                     fps = 0;
@@ -393,6 +409,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_pipeline(&render_pipeline.pipeline);
                     rpass.draw(0..3, 0..1);
                 }
+
+                // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
 
                 app.queue.submit(Some(encoder.finish()));
 

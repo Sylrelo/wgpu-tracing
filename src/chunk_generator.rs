@@ -8,7 +8,7 @@ const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
-const CHUNK_RADIUS: i32 = 2;
+const CHUNK_RADIUS: i32 = 5;
 
 // pub struct ChunksAabbGpu {
 //     position: [f32; 4],
@@ -103,9 +103,15 @@ impl Chunk {
 
     pub fn generate_around(&mut self, player_pos: [f32; 4]) {
         let mut generated_count = 0;
+        let player_pos_chunk = [
+            (player_pos[0] / CHUNK_X as f32) as i32,
+            0,
+            (player_pos[2] / CHUNK_Z as f32) as i32,
+        ];
+        
 
-        for x in player_pos[0] as i32 - CHUNK_RADIUS..player_pos[0] as i32 + CHUNK_RADIUS {
-            for z in player_pos[2] as i32 - CHUNK_RADIUS..player_pos[2] as i32 + CHUNK_RADIUS {
+        for x in player_pos_chunk[0] as i32 - CHUNK_RADIUS..player_pos_chunk[0] as i32 + CHUNK_RADIUS {
+            for z in player_pos_chunk[2] as i32 - CHUNK_RADIUS..player_pos_chunk[2] as i32 + CHUNK_RADIUS {
                 let pos = [x as i32, 0, z as i32, 0];
 
                 if self.generated_chunks.contains_key(&pos) == true {
@@ -129,7 +135,7 @@ impl Chunk {
 
         let mut unloaded_chunks = 0;
 
-        let farthest_chunks = self.clean_farthest_chunk(player_pos, 25.);
+        let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 10.);
         for chunk in farthest_chunks {
             let gen_chunk = self.generated_chunks.get(&chunk);
             let chunk_offset_id = gen_chunk.unwrap().clone();
@@ -141,7 +147,6 @@ impl Chunk {
             self.chunks_mem_free.push(chunk_offset_id);
             self.generated_chunks.remove(&chunk);
             unloaded_chunks += 1;
-
         }
 
         if unloaded_chunks > 0 {
@@ -157,7 +162,7 @@ impl Chunk {
                 1.0,
             ]);
         }
-        // println!("{:?}", self.generated_chunks_gpu);
+        println!("{:?}", self.generated_chunks_gpu.len());
 
         // for (index, value) in self.chunks_mem.iter().enumerate() {
         //     print!("{}", value);
@@ -194,11 +199,11 @@ impl Chunk {
         return free_zone;
     }
 
-    fn clean_farthest_chunk(&self, player_pos: [f32; 4], max_dist: f32) -> Vec<[i32; 4]> {
+    fn clean_farthest_chunk(&self, player_pos_chunk: [i32; 3], max_dist: f32) -> Vec<[i32; 4]> {
         let mut fartest_chunks: Vec<[i32; 4]> = Vec::new();
 
         for chunk in &self.generated_chunks {
-            let dist = Self::get_chunk_distance(player_pos, chunk.0);
+            let dist = Self::get_chunk_distance(player_pos_chunk, chunk.0);
 
             // println!("{}", dist);
 
@@ -214,15 +219,13 @@ impl Chunk {
         return fartest_chunks;
     }
 
-    fn get_chunk_distance(player_pos: [f32; 4], chunk_pos: &[i32; 4]) -> f32 {
-        let v: [f32; 4] = [
-            player_pos[0] - chunk_pos[0] as f32,
-            0.0,
-            player_pos[2] - chunk_pos[2] as f32,
-            0.0,
+    fn get_chunk_distance(player_pos_chunk: [i32; 3], chunk_pos: &[i32; 4]) -> f32 {
+        let v: [f32; 2] = [
+            player_pos_chunk[0] as f32 - chunk_pos[0] as f32,
+            player_pos_chunk[2] as f32 - chunk_pos[2] as f32,
         ];
 
-        let len = (v[0] * v[0] + v[2] * v[2]).sqrt();
+        let len = (v[0] * v[0] + v[1] * v[1]).sqrt();
 
         // println!("{:?} {:?} {}", player_pos, chunk_pos, len);
         return len;
