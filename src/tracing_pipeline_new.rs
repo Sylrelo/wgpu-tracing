@@ -7,11 +7,11 @@ use wgpu::{
 };
 
 use crate::{
+    chunk_generator::ChunkGpuBVHNode,
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
 };
-
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
@@ -35,6 +35,8 @@ pub struct TracingPipelineBuffers {
     pub chunks_size: u32,
 
     pub uniform: Buffer,
+
+    pub test_bvh_buffer: Buffer,
 }
 
 pub struct TracingPipelineTest {
@@ -49,7 +51,6 @@ pub struct TracingPipelineTest {
 #[allow(dead_code)]
 impl TracingPipelineTest {
     pub fn new(device: &Device, textures: &RenderTexture) -> Self {
-
         println!("Init TracingPipelineTest");
 
         let buffers = Self::create_buffers(device);
@@ -57,7 +58,7 @@ impl TracingPipelineTest {
         let bind_groups = TracingPipelineBindGroups {
             textures: Self::create_textures_bind_groups(device, textures),
             uniforms: Self::uniform_create_bind_groups(device, &buffers.uniform),
-            buffers: Self::buffers_create_bind_groups(device, &buffers.chunk_content, &buffers.chunks),
+            buffers: Self::buffers_create_bind_groups(device, &buffers),
         };
 
         let shader_module = Self::get_shader_module(device);
@@ -90,20 +91,26 @@ impl TracingPipelineTest {
         compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 16, 1);
     }
 
+    // ===============================
+
     pub fn chunks_buffer_update(&self, queue: &Queue, chunks: &Vec<[f32; 4]>) {
         queue.write_buffer(
             &self.buffers.chunks,
             0,
-            bytemuck::cast_slice(chunks.as_slice())
+            bytemuck::cast_slice(chunks.as_slice()),
+        );
+    }
+
+    pub fn chunk_bvh_buffer_update(&self, queue: &Queue, bvh_nodes: &Vec<ChunkGpuBVHNode>) {
+        queue.write_buffer(
+            &self.buffers.test_bvh_buffer,
+            0,
+            bytemuck::cast_slice(bvh_nodes.as_slice()),
         );
     }
 
     pub fn uniform_settings_update(&self, queue: &Queue, settings: TracingPipelineSettings) {
-        queue.write_buffer(
-            &self.buffers.uniform,
-            0,
-            bytemuck::cast_slice(&[settings])
-        );
+        queue.write_buffer(&self.buffers.uniform, 0, bytemuck::cast_slice(&[settings]));
     }
 
     // ===============================
@@ -128,7 +135,7 @@ impl TracingPipelineTest {
                 &bind_groups.uniforms.bind_group_layout,
                 &bind_groups.buffers.bind_group_layout,
                 &bind_groups.textures.bind_group_layout,
-                ],
+            ],
             push_constant_ranges: &[],
         });
 
@@ -159,15 +166,13 @@ impl TracingPipelineTest {
             .build()
     }
 
-    fn buffers_create_bind_groups(
-        device: &Device,
-        chunk_content: &Buffer,
-        chunks: &Buffer,
-    ) -> BindGroups {
+    fn buffers_create_bind_groups(device: &Device, buffers: &TracingPipelineBuffers) -> BindGroups {
         BindingGeneratorBuilder::new(device)
-            .with_default_buffer_storage(ShaderStages::COMPUTE, chunk_content, true)
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunk_content, true)
             .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, chunks, true)
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunks, true)
+            .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             .done()
             .build()
     }
@@ -194,12 +199,21 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
+        let test_bvh_buffer = device.create_buffer(&BufferDescriptor {
+            label: Label::from("Tracing Pipeline : BVH Buffer"),
+            mapped_at_creation: false,
+            size: 1600 * 8,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
+
         TracingPipelineBuffers {
             chunk_content,
             chunk_content_size: 900 * 4,
             chunks,
             chunks_size: 300 * 8,
             uniform,
+
+            test_bvh_buffer,
         }
     }
 }

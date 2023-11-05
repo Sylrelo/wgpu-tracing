@@ -36,6 +36,7 @@ var color_output: texture_storage_2d<rgba8unorm, write>;
 
 const M_PI = 3.14159265358;
 const M_TWOPI = 6.28318530718;
+const F64_MAX = 3.402823E+38;
 
 // UTILITY ===================================================
 
@@ -46,8 +47,8 @@ fn sdf_box(ray_pos: vec3<f32>) -> f32 {
     let b = vec3(32.0, 1.0, 32.0);
     let p = abs(ray_pos) - b;
 
-     let q = abs(p) - b;
-    return length(max(q, vec3(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
+    let q = abs(p) - b;
+    return length(max(q, vec3(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
 fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
@@ -58,10 +59,10 @@ fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
     let q = abs(p + e) - e;
 
     return min(min(
-      length(max(vec3(p.x,q.y,q.z), vec3(0.0)))+min(max(p.x,max(q.y,q.z)),0.0),
-      length(max(vec3(q.x,p.y,q.z), vec3(0.0)))+min(max(q.x,max(p.y,q.z)),0.0)),
-      length(max(vec3(q.x,q.y,p.z), vec3(0.0)))+min(max(q.x,max(q.y,p.z)),0.0));
-
+        length(max(vec3(p.x, q.y, q.z), vec3(0.0))) + min(max(p.x, max(q.y, q.z)), 0.0),
+        length(max(vec3(q.x, p.y, q.z), vec3(0.0))) + min(max(q.x, max(p.y, q.z)), 0.0)
+    ),
+        length(max(vec3(q.x, q.y, p.z), vec3(0.0))) + min(max(q.x, max(q.y, p.z)), 0.0));
 }
 fn raytrace(ray_in: Ray) -> vec3<f32> {
 
@@ -72,7 +73,7 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
 
         let pos = ray_in.orig + ray_in.dir * total_dist;
 
-        var chk_dst = 10000000.0;
+        var chk_dst = F64_MAX;
         for (var chunk_id = 0u; chunk_id < settings.chunk_count; chunk_id++) {
 
             let chunk_pos = chunks[chunk_id].xyz * vec3(36.0, 1.0, 36.0);
@@ -81,9 +82,9 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
             if t > 0.0 && t < chk_dst {
                 chk_dst = t;
             }
-        }   
+        }
 
-        if chk_dst >= 10000000.0 {
+        if chk_dst >= F64_MAX {
             break;
         }
 
@@ -100,7 +101,6 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
         }
 
         total_dist += chk_dst;
-
     }
 //     let len = arrayLength(&chunks);
 //     var real_len = 0u;
@@ -111,10 +111,10 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
 //         }
 //     }
 
-  return vec3(
-    0.05,
-    0.05,
-    0.05
+    return vec3(
+        0.05,
+        0.05,
+        0.05
     );
 
 //   return vec3(0.05, 0.05, 0.10);
@@ -143,9 +143,9 @@ fn main(
     var ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
 
     var ray: Ray = Ray(
-      settings.position.xyz, 
-      ray_direction, 
-      1.0 / ray_direction
+        settings.position.xyz,
+        ray_direction,
+        1.0 / ray_direction
     );
 
     textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));

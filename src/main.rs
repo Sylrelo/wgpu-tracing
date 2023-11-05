@@ -45,8 +45,8 @@ mod init_textures;
 mod init_wgpu;
 mod structs;
 mod tracing_pipeline;
-mod utils;
 mod tracing_pipeline_new;
+mod utils;
 
 impl App {
     pub async fn new(window: Window) -> App {
@@ -297,14 +297,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 chunks.generate_around(camera.position);
 
                 tracing_pipeline_new.uniform_settings_update(
-                    &app.queue, 
-                    TracingPipelineSettings{
-                       chunk_count: chunks.generated_chunks_gpu.len() as u32,
-                       player_position: camera.position,
-                       _padding: 0,
-                });
-                
+                    &app.queue,
+                    TracingPipelineSettings {
+                        chunk_count: chunks.generated_chunks_gpu.len() as u32,
+                        player_position: camera.position,
+                        _padding: 0,
+                    },
+                );
+
                 tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+                tracing_pipeline_new
+                    .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
 
                 // println!("{} Hello mofo", input.scancode);
             }
@@ -329,18 +332,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-
                     println!("Camera {:?}", camera.position);
 
-
                     // tracing_pipeline_new.uniform_settings_update(
-                    //     &app.queue, 
+                    //     &app.queue,
                     //     TracingPipelineSettings{
                     //        chunk_count: chunks.generated_chunks_gpu.len() as u32,
                     //        player_position: camera.position,
                     //        _padding: 0,
                     // });
-                    
 
                     // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
 
