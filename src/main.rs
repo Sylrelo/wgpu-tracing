@@ -301,13 +301,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     TracingPipelineSettings {
                         chunk_count: chunks.generated_chunks_gpu.len() as u32,
                         player_position: camera.position,
-                        _padding: 0,
+                        _padding: chunks.generated_chunks_gpubvh.len() as u32,
                     },
                 );
 
-                tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
-                tracing_pipeline_new
-                    .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
+                // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+                // tracing_pipeline_new
+                //     .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
 
                 // println!("{} Hello mofo", input.scancode);
             }
@@ -332,7 +332,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-                    println!("Camera {:?}", camera.position);
+                    // println!("Camera {:?}", camera.position);
 
                     // tracing_pipeline_new.uniform_settings_update(
                     //     &app.queue,
@@ -346,7 +346,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                     // app.queue.submit();
 
-                    println!("FPS: {}", fps);
+                    // println!("FPS: {}", fps);
                     fps = 0;
                     last_time = curr;
                 }
@@ -385,7 +385,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 // tracing_pipeline.compute_pass(&mut encoder);
-                tracing_pipeline_new.exec_pass(&mut encoder);
+                // tracing_pipeline_new.exec_pass(&mut encoder);
 
                 // denoiser_pipeline.exec_pass(&mut encoder);
 

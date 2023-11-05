@@ -3,7 +3,6 @@ use std::{
     time::Instant,
 };
 
-use image::flat;
 use noise::{core::simplex::simplex_2d, permutationtable::PermutationTable};
 
 static mut PERMTABLE: Option<PermutationTable> = None;
@@ -17,15 +16,10 @@ const CHUNK_RADIUS: i32 = 5;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct ChunkGpuBVHNode {
-    // pub aabb_min: [f32; 4],
-    // pub aabb_max: [f32; 4],
-    pub position: [f32; 4],
+    pub aabb_min: [f32; 4],
+    pub aabb_max: [f32; 4],
     pub data: [u32; 4], // 0: entry_index, 1: exit_index, 2: chunk_id.
-
-                        // pub entry_index: u32,
-                        // pub exit_index: u32,
-                        // pub chunk_id: u32,
-                        // pub _padding: u32,
+    pub _padding: [f32; 4],
 }
 
 #[allow(dead_code)]
@@ -37,17 +31,16 @@ impl ChunkGpuBVHNode {
         exit_index: u32,
         chunk_id: u32,
     ) -> ChunkGpuBVHNode {
-        let position = [aabb.min.x, aabb.min.y, aabb.min.z];
-
         ChunkGpuBVHNode {
-            // aabb_min: [aabb.min.x, aabb.min.y, aabb.min.z, 0.0],
-            // aabb_max: [aabb.max.x, aabb.max.y, aabb.max.z, 0.0],
-            position: [(position[0]) as f32, 0.0, (position[2]) as f32, 0.0],
+            aabb_min: [aabb.min.x, aabb.min.y, aabb.min.z, 0.0],
+            aabb_max: [aabb.max.x, aabb.max.y, aabb.max.z, 0.0],
+            // position: [(position[0]) as f32, 0.0, (position[2]) as f32, 0.0],
             data: [entry_index, exit_index, chunk_id, 0],
             // entry_index,
             // exit_index,
             // chunk_id,
             // _padding: 0,
+            _padding: [0.0, 0.0, 0.0, 0.0],
         }
     }
 }
@@ -67,7 +60,7 @@ impl bvh::aabb::Bounded for ChunkData {
             ),
             bvh::Point3::new(
                 CHUNK_X as f32 + (self.position[0] as f32 * CHUNK_X as f32),
-                0.0,
+                CHUNK_Y as f32,
                 CHUNK_Z as f32 + (self.position[2] as f32 * CHUNK_Z as f32),
             ),
         );
@@ -101,6 +94,11 @@ pub struct Chunk {
     chunks_mem_free: Vec<usize>,
 
     chunk_to_upload: HashSet<usize>,
+
+    test_pos: [f32; 3],
+    last_pos: [f32; 3],
+
+    chunks_uniform_grod: Vec<u32>,
 }
 
 #[allow(dead_code, unused_variables)]
@@ -118,6 +116,11 @@ impl Chunk {
             chunks_mem_free: Vec::new(),
 
             chunk_to_upload: HashSet::new(),
+
+            test_pos: [0.0, 0.0, 0.0],
+            last_pos: [0.0, 0.0, 0.0],
+
+            chunks_uniform_grod: Vec::new(),
         }
     }
 
@@ -207,12 +210,52 @@ impl Chunk {
             );
         }
 
+        println!("{:?} {:?}", player_pos, player_pos_chunk);
+        // if self.test_pos[0] == 0.0
+
+        if player_pos[0] != self.last_pos[0] {
+            self.test_pos[0] += player_pos[0] - self.last_pos[0];
+
+            if self.test_pos[0].abs() >= 1.0 {
+                self.test_pos[0] = self.test_pos[0].fract()
+            }
+
+            self.last_pos[0] = player_pos[0];
+        }
+        if player_pos[2] != self.last_pos[2] {
+            self.test_pos[2] += player_pos[2] - self.last_pos[2];
+
+            if self.test_pos[2].abs() >= 1.0 {
+                self.test_pos[2] = self.test_pos[2].fract()
+            }
+
+            self.last_pos[2] = player_pos[2];
+        }
+
+        // for chunk in &self.generated_chunks {
+        //     println!("{:?}", chunk);
+        // }
+
+        // println!(" {:?} - {:?} ", self.test_pos, player_pos);
+
+        // for z in player_pos_chunk[2] - CHUNK_RADIUS..player_pos_chunk[2] + CHUNK_RADIUS {
+        //     for x in player_pos_chunk[0] - CHUNK_RADIUS..player_pos_chunk[0] + CHUNK_RADIUS {
+        //         print!(" [{:2} {:2}] ", x, z);
+        //     }
+        //     println!("");
+        //     // println!("{} {}", x, player_pos_chunk[0] + CHUNK_RADIUS);
+
+        //     // if x >= player_pos_chunk[0] + CHUNK_RADIUS {
+        //     //     println!("");
+        //     // }
+        // }
+
         // self.generated_chunks.
 
         // println!("{:?}", self.voxels.len());
         // return ;
 
-        let mut unloaded_chunks = 0;
+        let mut unloaded_chunks = 2;
 
         let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 10.);
         for chunk in farthest_chunks {
@@ -236,6 +279,23 @@ impl Chunk {
             );
         }
 
+        println!("");
+        for z in -10..10 {
+            for x in -10..10 {
+                let pos = [player_pos_chunk[0] - x, 0, player_pos_chunk[2] - z, 0];
+                let chunk = self.generated_chunks.get(&pos);
+
+                if chunk.is_some() {
+                    print!("[{:3}{:3}] ", pos[0], pos[2]);
+                } else {
+                    print!("[      ] ");
+                }
+            }
+            println!("");
+        }
+        println!("");
+        println!("{:?}", player_pos);
+
         let mut chunks_as_vecforbvhtest: Vec<ChunkData> = Vec::new();
 
         self.generated_chunks_gpu.clear();
@@ -245,7 +305,7 @@ impl Chunk {
 
             chunks_as_vecforbvhtest.push(ChunkData {
                 bvh_index: 0,
-                position: [chunk.0[0] as i32, chunk.0[1] as i32, chunk.0[2] as i32],
+                position: [chunk.0[0] as i32, 0, chunk.0[2] as i32],
             });
         }
         // println!("{:?}", self.generated_chunks_gpu.len());
@@ -267,7 +327,20 @@ impl Chunk {
             startbvhtime.elapsed().as_micros()
         );
         // for (index, flat) in self.generated_chunks_gpubvh.iter().enumerate() {
-        //     println!("{:>10} - {:?} - {:?} ", index, flat.position, flat.data,);
+        // println!("{:>10} - {:?} - {:?} ", index, flat.position, flat.data,);
+
+        // if flat.data[0] >= 4000000 {
+        // continue;
+        // }
+        // println!(
+        //     "Cylinder(({},{},{}),({},{},{}),5)",
+        //     flat.position[0],
+        //     flat.position[1],
+        //     flat.position[2],
+        //     flat.position[0] + CHUNK_X as f32,
+        //     flat.position[1] + CHUNK_Y as f32,
+        //     flat.position[2] + CHUNK_Z as f32
+        // );
         // }
         // for (index, value) in self.chunks_mem.iter().enumerate() {
         //     print!("{}", value);

@@ -195,14 +195,14 @@ impl TracingPipelineTest {
         let chunks = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
             mapped_at_creation: false,
-            size: 1600 * 8,
+            size: 2600 * 8,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
         let test_bvh_buffer = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : BVH Buffer"),
             mapped_at_creation: false,
-            size: 1600 * 8,
+            size: 2600 * 8,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
