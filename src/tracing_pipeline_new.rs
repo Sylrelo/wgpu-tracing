@@ -37,6 +37,7 @@ pub struct TracingPipelineBuffers {
     pub uniform: Buffer,
 
     pub test_bvh_buffer: Buffer,
+    pub test_uniform_grid_chunks: Buffer,
 }
 
 pub struct TracingPipelineTest {
@@ -109,6 +110,14 @@ impl TracingPipelineTest {
         );
     }
 
+    pub fn chunk_grid_buffer_update(&self, queue: &Queue, grid: &Vec<[u32; 4]>) {
+        queue.write_buffer(
+            &self.buffers.test_uniform_grid_chunks,
+            0,
+            bytemuck::cast_slice(grid.as_slice()),
+        );
+    }
+
     pub fn uniform_settings_update(&self, queue: &Queue, settings: TracingPipelineSettings) {
         queue.write_buffer(&self.buffers.uniform, 0, bytemuck::cast_slice(&[settings]));
     }
@@ -174,6 +183,12 @@ impl TracingPipelineTest {
             .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             .done()
+            .with_default_buffer_storage(
+                ShaderStages::COMPUTE,
+                &buffers.test_uniform_grid_chunks,
+                true,
+            )
+            .done()
             .build()
     }
 
@@ -206,6 +221,13 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
+        let test_uniform_grid_chunks = device.create_buffer(&BufferDescriptor {
+            label: Label::from("Tracing Pipeline : BVH Buffer"),
+            mapped_at_creation: false,
+            size: 2600 * 8,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
+
         TracingPipelineBuffers {
             chunk_content,
             chunk_content_size: 900 * 4,
@@ -214,6 +236,7 @@ impl TracingPipelineTest {
             uniform,
 
             test_bvh_buffer,
+            test_uniform_grid_chunks,
         }
     }
 }

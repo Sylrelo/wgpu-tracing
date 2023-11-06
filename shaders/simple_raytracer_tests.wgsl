@@ -24,6 +24,7 @@ struct ChunkBvhNode {
     data: vec4<u32>,
     _padding: vec4<u32>,
 }
+
 // DATA ======================================================
 
 @group(0) @binding(0)
@@ -37,6 +38,9 @@ var<storage> chunks: array<vec4<f32>>;
 
 @group(1) @binding(2)
 var<storage> chunks_bvh: array<ChunkBvhNode>;
+
+@group(1) @binding(3)
+var<storage> chunks_grid: array<vec3<u32>>;
 
 @group(2) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
@@ -53,6 +57,110 @@ const F32_MAX = 3.402823E+38;
 // ===========================================================
 
 // TEST ======================================================
+
+struct DataDda {
+    map: vec3<i32>,
+    max: vec3<f32>,
+    step_amount: vec3<i32>,
+    delta: vec3<f32>,
+    side: i32,
+    hit_data: u32,
+    t: f32,
+}
+
+fn prepare_dda(ray: Ray) -> DataDda {
+    var dda: DataDda;
+
+    dda.map = vec3<i32>(ray.orig);
+    dda.delta = vec3(abs(ray.inv_dir));
+    dda.step_amount = vec3(0);
+    dda.max = vec3(0.0);
+
+    if ray.dir.x < 0.0 {
+        dda.step_amount.x = -1;
+        dda.max.x = (ray.orig.x - f32(dda.map.x)) * dda.delta.x;
+    } else if ray.dir.x > 0.0 {
+        dda.step_amount.x = 1;
+        dda.max.x = (f32(dda.map.x) + 1.0 - ray.orig.x) * dda.delta.x;
+    }
+
+    if ray.dir.y < 0.0 {
+        dda.step_amount.y = -1;
+        dda.max.y = (ray.orig.y - f32(dda.map.y)) * dda.delta.y;
+    } else if ray.dir.y > 0.0 {
+        dda.step_amount.y = 1;
+        dda.max.y = (f32(dda.map.y) + 1.0 - ray.orig.y) * dda.delta.y;
+    }
+
+    if ray.dir.z < 0.0 {
+        dda.step_amount.z = -1;
+        dda.max.z = (ray.orig.z - f32(dda.map.z)) * dda.delta.z;
+    } else if ray.dir.z > 0.0 {
+        dda.step_amount.z = 1;
+        dda.max.z = (f32(dda.map.z) + 1.0 - ray.orig.z) * dda.delta.z;
+    }
+
+    return dda;
+}
+
+fn dda_steps(ray: Ray, dda: ptr<function, DataDda>) {
+    if (*dda).max.x < (*dda).max.y && (*dda).max.x < (*dda).max.z {
+        (*dda).map.x += (*dda).step_amount.x;
+        (*dda).max.x += (*dda).delta.x;
+        (*dda).side = 0;
+        (*dda).t = (f32((*dda).map.x) - ray.orig.x + f32(1 - (*dda).step_amount.x) * 0.5) * ray.inv_dir.x;
+    } else if (*dda).max.y < (*dda).max.z {
+        (*dda).map.y += (*dda).step_amount.y;
+        (*dda).max.y += (*dda).delta.y;
+        (*dda).side = 2;
+        (*dda).t = (f32((*dda).map.y) - ray.orig.y + f32(1 - (*dda).step_amount.y) * 0.5) * ray.inv_dir.y;
+    } else {
+        (*dda).map.z += (*dda).step_amount.z;
+        (*dda).max.z += (*dda).delta.z;
+        (*dda).side = 1;
+        (*dda).t = (f32((*dda).map.z) - ray.orig.z + f32(1 - (*dda).step_amount.z) * 0.5) * ray.inv_dir.z;
+    }
+}
+
+fn dda_chunks(ray: Ray) -> u32 {
+    var dda: DataDda = prepare_dda(ray);
+    var chunk_offset = 0u;
+
+    var iter = 0;
+    var d = F32_MAX;
+
+    while iter < 1000 {
+        iter++;
+        dda_steps(ray, &dda);
+
+
+        if dda.map.z < 0 || dda.map.z >= 20 || dda.map.x < 0 || dda.map.x >= 20 || dda.map.y != 0 {
+            continue;
+        }
+
+        chunk_offset = chunks_grid[dda.map.x + 20 * dda.map.z][0];
+
+        let pos = ray.orig + ray.dir * (dda.t - 0.005);
+        var ray2: Ray;
+
+        ray2.orig = pos;
+        ray2.dir = ray.dir;
+        ray2.inv_dir = ray.inv_dir;
+        let t = intersect_aabb(
+            ray2,
+            vec3(f32(dda.map.x), 0.0, f32(dda.map.z)),
+            vec3(f32(dda.map.x) + 36.0, 256.0, f32(dda.map.z) + 36.0),
+        );
+
+        if t > 0.0 && t < d {
+            d = t;
+        }
+    }
+
+    return chunk_offset;
+
+    // return chunk_offset != 0u;
+}
 
 fn intersect_aabb(ray: Ray, min: vec3<f32>, max: vec3<f32>) -> f32 {
 
@@ -210,6 +318,17 @@ fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
 }
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
+
+
+
+    let pute = dda_chunks(ray_in);
+
+    if pute != 0u {
+        return vec3(0.2, 0.3, 0.5);
+    } else {
+        return vec3(0.0, 0.0, 0.0);
+    }
+
 
     let bvh_chunk_hit = traverse_chunks_bvh(ray_in);
 

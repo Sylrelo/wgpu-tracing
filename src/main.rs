@@ -308,6 +308,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
                 // tracing_pipeline_new
                 //     .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
+                tracing_pipeline_new
+                    .chunk_grid_buffer_update(&app.queue, &chunks.chunks_uniform_grod);
 
                 // println!("{} Hello mofo", input.scancode);
             }
@@ -385,7 +387,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 // tracing_pipeline.compute_pass(&mut encoder);
-                // tracing_pipeline_new.exec_pass(&mut encoder);
+                tracing_pipeline_new.exec_pass(&mut encoder);
 
                 // denoiser_pipeline.exec_pass(&mut encoder);
 

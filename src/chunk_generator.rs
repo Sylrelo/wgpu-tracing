@@ -98,7 +98,7 @@ pub struct Chunk {
     test_pos: [f32; 3],
     last_pos: [f32; 3],
 
-    chunks_uniform_grod: Vec<u32>,
+    pub chunks_uniform_grod: Vec<[u32; 4]>,
 }
 
 #[allow(dead_code, unused_variables)]
@@ -257,7 +257,7 @@ impl Chunk {
 
         let mut unloaded_chunks = 2;
 
-        let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 10.);
+        let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 7.);
         for chunk in farthest_chunks {
             let gen_chunk = self.generated_chunks.get(&chunk);
             let chunk_offset_id = gen_chunk.unwrap().clone();
@@ -279,6 +279,9 @@ impl Chunk {
             );
         }
 
+        self.chunks_uniform_grod.clear();
+        self.chunks_uniform_grod.resize(20 * 20, [0, 0, 0, 0]);
+
         println!("");
         for z in -10..10 {
             for x in -10..10 {
@@ -286,13 +289,34 @@ impl Chunk {
                 let chunk = self.generated_chunks.get(&pos);
 
                 if chunk.is_some() {
-                    print!("[{:3}{:3}] ", pos[0], pos[2]);
+                    // print!("[{:6}] ", chunk.unwrap());
+                    self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize] = [
+                        chunk.unwrap().clone() as u32 * CHUNK_TSIZE as u32 + 1,
+                        0,
+                        0,
+                        0,
+                    ];
                 } else {
-                    print!("[      ] ");
+                    // print!("[      ] ");
+                    self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize] = [0, 0, 0, 0];
+                }
+            }
+            // println!("");
+        }
+
+        for z in -10..10 {
+            for x in -10..10 {
+                let chunk = self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize];
+                if chunk[0] != 0 {
+                    print!("[{:8}] ", chunk[0]);
+                } else {
+                    print!("[        ] ");
                 }
             }
             println!("");
         }
+        println!("{}", self.chunks_uniform_grod.len());
+
         println!("");
         println!("{:?}", player_pos);
 
