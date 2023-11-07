@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Read;
 
 use std::path::Path;
@@ -251,8 +251,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .unwrap()
         .as_secs();
 
+    let mut last_shader_update: u64 = 0;
+
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::Poll;
 
         let mut app = app.lock().unwrap();
         // let tracing_pipeline = tracing_pipeline.lock().unwrap();
@@ -294,7 +296,38 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 //     bytemuck::cast_slice(&[camera]),
                 // );
 
+                // let test = fs::metadata("E:\\Dev\\test-ray\\shaders\\simple_raytracer_tests.wgsl")
+                //     .unwrap()
+                //     .modified()
+                //     .unwrap()
+                //     .duration_since(UNIX_EPOCH)
+                //     .unwrap()
+                //     .as_secs();
+
+                // if last_shader_update == 0 {
+                //     last_shader_update = test;
+                // }
+                // if test > last_shader_update {
+                //     last_shader_update = test;
+
+                //     let shader_module = compile_shader(
+                //         &app.device,
+                //         &"E:\\Dev\\test-ray\\shaders\\simple_raytracer_tests.wgsl".to_string(),
+                //     );
+                //     if shader_module.is_some() {
+                //         println!("Recreate");
+                //         tracing_pipeline_new.recreate_pipeline(&app.device, shader_module.unwrap());
+                //     }
+                // }
+
+                // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+                // tracing_pipeline_new
+                //     .chunk_grid_buffer_update(&app.queue, &chunks.chunks_uniform_grod);
+
+                // println!("{} Hello mofo", input.scancode);
                 chunks.generate_around(camera.position);
+                tracing_pipeline_new
+                    .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
 
                 tracing_pipeline_new.uniform_settings_update(
                     &app.queue,
@@ -302,19 +335,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         chunk_count: chunks.chunks_mem.len() as u32,
                         // chunk_count: chunks.generated_chunks_gpu.len() as u32,
                         player_position: camera.position,
-                        _padding: 0,
-                        // _padding: chunks.generated_chunks_gpubvh.len() as u32,
+                        // _padding: 0,
+                        _padding: chunks.generated_chunks_gpubvh.len() as u32,
                     },
                 );
-
-                // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
-                tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
-                // tracing_pipeline_new
-                //     .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
-                tracing_pipeline_new
-                    .chunk_grid_buffer_update(&app.queue, &chunks.chunks_uniform_grod);
-
-                // println!("{} Hello mofo", input.scancode);
             }
 
             Event::WindowEvent {
@@ -337,6 +361,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
+                    // tracing_pipeline_new
+                    //     .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
+
                     // println!("Camera {:?}", camera.position);
 
                     // tracing_pipeline_new.uniform_settings_update(

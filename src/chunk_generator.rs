@@ -3,6 +3,7 @@ use std::{
     time::Instant,
 };
 
+use cgmath::num_traits::Float;
 use noise::{core::simplex::simplex_2d, permutationtable::PermutationTable};
 
 static mut PERMTABLE: Option<PermutationTable> = None;
@@ -11,7 +12,7 @@ const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
-const CHUNK_RADIUS: i32 = 5;
+const CHUNK_RADIUS: i32 = 8;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
@@ -65,6 +66,7 @@ impl bvh::aabb::Bounded for ChunkData {
             ),
         );
 
+        // println!("{:?} - min {:?} max {:?}", self.position, uwu.min, uwu.max);
         return uwu;
     }
 }
@@ -87,9 +89,7 @@ pub struct Chunk {
     generated_chunks: HashMap<[i32; 4], usize>,
 
     // pub generated_chunks_gpu: Vec<[f32; 4]>,
-
-    // pub generated_chunks_gpubvh: Vec<ChunkGpuBVHNode>,
-
+    pub generated_chunks_gpubvh: Vec<ChunkGpuBVHNode>,
     pub chunks_mem: Vec<u32>,
     chunks_mem_free: Vec<usize>,
 
@@ -97,21 +97,19 @@ pub struct Chunk {
 
     // test_pos: [f32; 3],
     // last_pos: [f32; 3],
-
     pub chunks_uniform_grod: Vec<[u32; 4]>,
 }
 
 #[allow(dead_code, unused_variables)]
 impl Chunk {
     pub fn init() -> Self {
-         Self {
+        Self {
             // chunks: Vec::new(),
             // voxels: Vec::new(),
             generated_chunks: HashMap::new(),
 
             // generated_chunks_gpu: Vec::new(),
-            // generated_chunks_gpubvh: Vec::new(),
-
+            generated_chunks_gpubvh: Vec::new(),
             chunks_mem: Vec::new(),
             chunks_mem_free: Vec::new(),
 
@@ -119,7 +117,6 @@ impl Chunk {
 
             // test_pos: [0.0, 0.0, 0.0],
             // last_pos: [0.0, 0.0, 0.0],
-
             chunks_uniform_grod: Vec::new(),
         }
     }
@@ -134,14 +131,13 @@ impl Chunk {
         // self.generated_chunks.iter().
         // let chunk_offset = self.chunks_mem.len();
 
-
         let chunk_offset = self.get_free_chunk_memory_zone();
         // self.chunks_mem.resize(chunk_offset + CHUNK_TSIZE, 0);
 
         self.generated_chunks
             .insert(position, chunk_offset / CHUNK_TSIZE);
 
-            // println!("{}", chunk_offset);
+        // println!("{}", chunk_offset);
         // println!("Generating {:?}", position);
         // println!(
         //     " - Offset {:?} | Index_offset {:?}",
@@ -167,8 +163,8 @@ impl Chunk {
                         .min(CHUNK_Y as f64)
                         .max(0.0) as usize;
 
-                        // println!("Y {}", y);/
-                        
+                    // println!("Y {}", y);/
+
                     for y in (0..y).rev() {
                         let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
                         // let index = y * CHUNK_X * CHUNK_Y + z * CHUNK_X + x;
@@ -177,7 +173,6 @@ impl Chunk {
                         self.chunks_mem[chunk_offset + index] = 1;
                         // self.chunks_mem[chunk_offset + index] = 1;
                         // print!("{:?}", self.chunks_mem[chunk_offset + index]);
-
                     }
 
                     // self.voxels[voxels_id][x + 36 * (y + 256 * z)] = 1;
@@ -187,15 +182,15 @@ impl Chunk {
             }
             // }
         }
-        println!("");
+        // println!("");
 
         self.chunk_to_upload.insert(chunk_offset / CHUNK_TSIZE);
-
 
         // println!("Chunks to GPU-Update {}", self.chunk_to_upload.len());
     }
 
     pub fn generate_around(&mut self, player_pos: [f32; 4]) {
+        let time_to_generate_arount_start = Instant::now();
         let mut generated_count = 0;
         let player_pos_chunk = [
             (player_pos[0] / CHUNK_X as f32) as i32,
@@ -219,6 +214,25 @@ impl Chunk {
                 self.new(pos)
             }
         }
+        println!(
+            "+++ Generated Around : {}ms",
+            time_to_generate_arount_start.elapsed().as_millis()
+        );
+
+        // let pos = [0, 0, 0, 0];
+        // if self.generated_chunks.contains_key(&pos) == false {
+        //     self.new(pos);
+        // }
+        // let pos = [1, 0, 0, 0];
+        // if self.generated_chunks.contains_key(&pos) == false {
+        //     self.new(pos);
+        // }
+        // let pos = [-1, 0, 0, 0];
+        // if self.generated_chunks.contains_key(&pos) == false {
+        //     self.new(pos);
+        // }
+
+        println!("{}", self.chunks_mem.len());
 
         if generated_count > 0 {
             println!(
@@ -273,116 +287,122 @@ impl Chunk {
         // println!("{:?}", self.voxels.len());
         // return ;
 
-        // let mut unloaded_chunks = 2;
-        // let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 7.);
-        // for chunk in farthest_chunks {
-        //     let gen_chunk = self.generated_chunks.get(&chunk);
-        //     let chunk_offset_id = gen_chunk.unwrap().clone();
+        let mut unloaded_chunks = 2;
+        let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 9.);
+        for chunk in farthest_chunks {
+            let gen_chunk = self.generated_chunks.get(&chunk);
+            let chunk_offset_id = gen_chunk.unwrap().clone();
 
-        //     for i in chunk_offset_id * CHUNK_TSIZE..(chunk_offset_id + 1) * CHUNK_TSIZE {
-        //         self.chunks_mem[i] = 0;
-        //     }
-
-        //     self.chunks_mem_free.push(chunk_offset_id);
-        //     self.generated_chunks.remove(&chunk);
-        //     unloaded_chunks += 1;
-        // }
-
-        // if unloaded_chunks > 0 {
-        //     println!(
-        //         "Unloaded chunks : {}. New Total : {}",
-        //         unloaded_chunks,
-        //         self.generated_chunks.len()
-        //     );
-        // }
-
-        self.chunks_uniform_grod.clear();
-        self.chunks_uniform_grod.resize(20 * 20, [0, 0, 0, 0]);
-
-        println!("");
-        for z in -10..10 {
-            for x in -10..10 {
-                let pos = [player_pos_chunk[0] - x, 0, player_pos_chunk[2] - z, 0];
-                let chunk = self.generated_chunks.get(&pos);
-
-                if chunk.is_some() {
-                    // print!("[{:6}] ", chunk.unwrap());
-                    self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize] = [
-                        (chunk.unwrap().clone() as u32 * CHUNK_TSIZE as u32) + 1,
-                        0,
-                        0,
-                        0,
-                    ];
-                } else {
-                    // print!("[      ] ");
-                    self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize] = [0, 0, 0, 0];
-                }
+            for i in chunk_offset_id * CHUNK_TSIZE..(chunk_offset_id + 1) * CHUNK_TSIZE {
+                self.chunks_mem[i] = 0;
             }
-            // println!("");
+
+            self.chunks_mem_free.push(chunk_offset_id);
+            self.generated_chunks.remove(&chunk);
+            unloaded_chunks += 1;
         }
 
-        for z in -10..10 {
-            for x in -10..10 {
-                let chunk = self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize];
-                if chunk[0] != 0 {
-                    print!("[{:8}] ", chunk[0] - 1);
-                } else {
-                    print!("[        ] ");
-                }
-            }
-            println!("");
+        if unloaded_chunks > 0 {
+            println!(
+                "Unloaded chunks : {}. New Total : {}",
+                unloaded_chunks,
+                self.generated_chunks.len()
+            );
         }
-        println!("{}", self.chunks_uniform_grod.len());
 
-        println!("");
-        println!("{:?}", player_pos);
+        println!(
+            "+++ Unload Chunks : {}ms",
+            time_to_generate_arount_start.elapsed().as_millis()
+        );
+        // println!("");
+        // println!("{:?}", player_pos);
 
-        // let mut chunks_as_vecforbvhtest: Vec<ChunkData> = Vec::new();
+        let mut chunks_as_vecforbvhtest: Vec<ChunkData> = Vec::new();
 
         // self.generated_chunks_gpu.clear();
-        // for chunk in &self.generated_chunks {
-        //     self.generated_chunks_gpu
-        //         .push([chunk.0[0] as f32, 0.0, chunk.0[2] as f32, 1.0]);
+        for chunk in &self.generated_chunks {
+            // self.generated_chunks_gpu
+            //     .push([chunk.0[0] as f32, 0.0, chunk.0[2] as f32, 1.0]);
 
-        //     chunks_as_vecforbvhtest.push(ChunkData {
-        //         bvh_index: 0,
-        //         position: [chunk.0[0] as i32, 0, chunk.0[2] as i32],
-        //     });
-        // }
+            chunks_as_vecforbvhtest.push(ChunkData {
+                bvh_index: 0,
+                position: [chunk.0[0] as i32, 0, chunk.0[2] as i32],
+            });
+
+            // println!("=> {:?}", chunk.0);
+        }
+
+        println!(
+            "+++ Prepare for BVH : {}ms",
+            time_to_generate_arount_start.elapsed().as_millis()
+        );
         // println!("{:?}", self.generated_chunks_gpu.len());
-
-        // let mut chunks_as_vecforbvhtest : Vec<ChunkData> = Vec::new();
 
         // println!("=> {}", chunks_as_vecforbvhtest.len());
 
-        // let startbvhtime = Instant::now();
-        // let bvh = bvh::bvh::BVH::build(&mut chunks_as_vecforbvhtest);
+        let startbvhtime = Instant::now();
+        let bvh = bvh::bvh::BVH::build(&mut chunks_as_vecforbvhtest);
 
-        // let custom_constructor = |aabb: &bvh::aabb::AABB, entry, exit, shape_index| {
-        //     ChunkGpuBVHNode::new(aabb, entry, exit, shape_index)
-        // };
-        // self.generated_chunks_gpubvh = bvh.flatten_custom(&custom_constructor);
+        let custom_constructor = |aabb: &bvh::aabb::AABB, entry, exit, shape_index| {
+            ChunkGpuBVHNode::new(aabb, entry, exit, shape_index)
+        };
+        self.generated_chunks_gpubvh.clear();
 
-        // println!(
-        //     "Time taken to build Chunk BVH : {} us",
-        //     startbvhtime.elapsed().as_micros()
-        // );
+        self.generated_chunks_gpubvh = bvh.flatten_custom(&custom_constructor);
+        println!(
+            "Len {}; Size : {}",
+            self.generated_chunks_gpubvh.len(),
+            self.generated_chunks_gpubvh.len() * 32
+        );
+
+        println!(
+            "+++ BVH Build : {} us",
+            time_to_generate_arount_start.elapsed().as_micros()
+        );
+
+        println!(
+            "Elapsed total {} ms",
+            time_to_generate_arount_start.elapsed().as_millis()
+        );
+
         // for (index, flat) in self.generated_chunks_gpubvh.iter().enumerate() {
-        // println!("{:>10} - {:?} - {:?} ", index, flat.position, flat.data,);
+        //     let size = ((flat.aabb_max[0] - flat.aabb_min[0])
+        //         * (flat.aabb_max[0] - flat.aabb_min[0]))
+        //         + ((flat.aabb_max[2] - flat.aabb_min[2]) * (flat.aabb_max[2] - flat.aabb_min[2]));
 
-        // if flat.data[0] >= 4000000 {
-        // continue;
+        //     println!(
+        //         "{:>10} - [{:?} {:?}] - {:?} => {}",
+        //         index,
+        //         flat.aabb_min,
+        //         flat.aabb_max,
+        //         flat.data,
+        //         size.sqrt()
+        //     );
         // }
-        // println!(
-        //     "Cylinder(({},{},{}),({},{},{}),5)",
-        //     flat.position[0],
-        //     flat.position[1],
-        //     flat.position[2],
-        //     flat.position[0] + CHUNK_X as f32,
-        //     flat.position[1] + CHUNK_Y as f32,
-        //     flat.position[2] + CHUNK_Z as f32
-        // );
+        // if flat.data[0] == 4294967295 {
+        //     let cul = &chunks_as_vecforbvhtest[flat.data[2] as usize];
+        //     println!("cul {:?}", cul.position);
         // }
+
+        //     println!(
+        //         "Polygon(({}, {}, {}), ({}, {}, {}), ({}, {}, {}), ({}, {}, {}))",
+        //         flat.aabb_min[0],
+        //         flat.aabb_min[1],
+        //         flat.aabb_min[2],
+
+        //         flat.aabb_min[0],
+        //         flat.aabb_min[1],
+        //         flat.aabb_max[2],
+
+        //         flat.aabb_max[0],
+        //         flat.aabb_min[1],
+        //         flat.aabb_max[2],
+        //         flat.aabb_max[0],
+        //         flat.aabb_min[1],
+        //         flat.aabb_min[2],
+        //     );
+        // }
+
         // for (index, value) in self.chunks_mem.iter().enumerate() {
         //     print!("{}", value);
         //     if index % CHUNK_TSIZE == 0 {
@@ -408,8 +428,12 @@ impl Chunk {
         if self.chunks_mem_free.is_empty() {
             let chunk_offset = self.chunks_mem.len();
             self.chunks_mem.resize(chunk_offset + CHUNK_TSIZE, 0);
-            
-            println!("Empty, new size : {} -> {} ", chunk_offset,chunk_offset + CHUNK_TSIZE );
+
+            println!(
+                "Empty, new size : {} -> {} ",
+                chunk_offset,
+                chunk_offset + CHUNK_TSIZE
+            );
             return chunk_offset;
         }
         let free_zone = self.chunks_mem_free.pop().unwrap() * CHUNK_TSIZE;
