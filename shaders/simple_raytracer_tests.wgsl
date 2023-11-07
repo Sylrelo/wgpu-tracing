@@ -36,12 +36,6 @@ var<storage> chunk_content: array<u32>;
 @group(1) @binding(1)
 var<storage> chunks: array<vec4<f32>>;
 
-@group(1) @binding(2)
-var<storage> chunks_bvh: array<ChunkBvhNode>;
-
-// @group(1) @binding(3)
-// var<storage> chunks_grid: array<vec3<u32>>;
-
 @group(2) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
 
@@ -167,95 +161,6 @@ fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
     return voxel_hit;
 }
 
-fn traverse_bvh_chunks(ray: Ray) -> VoxelHit {
-    var voxel_hit: VoxelHit;
-    voxel_hit.dist = F32_MAX;
-
-    var node_index = 0u;
-    var prev_node_index = 0u;
-
-    var iter = 0u;
-    var last_t = F32_MAX;
-    var last_tt = F32_MAX;
-
-    while node_index < settings.bvh_node_count {
-        iter++;
-
-        if iter > 140u {
-            break;
-        }
-
-        let node = chunks_bvh[node_index];
-        if node.data[0] == 4294967295u {
-
-            let prev_node = chunks_bvh[prev_node_index];
-            // let t = intersect_aabb(ray, prev_node.min.xyz, prev_node.max.xyz);
-
-            // if t < last_tt {
-                // last_tt = t;
-                // voxel_hit.dist = t;
-                // voxel_hit.voxel = 1u;
-
-            var ray_voxel = ray;
-            ray_voxel.orig -= prev_node.min.xyz;
-
-            let voxel_hit_tml = dda_voxels(ray_voxel, node.data[2]);
-
-            if voxel_hit_tml.voxel != 0u && voxel_hit_tml.dist < voxel_hit.dist {
-                voxel_hit = voxel_hit_tml;
-            }
-            // }
-            // ray_voxel.orig = prev_node.max.xyz;
-            // ray_voxel.orig = vec3(0.0);
-
-            // ray_voxel.orig -= prev_node.min.xyz;
-
-            // let voxel_hit_tmp = dda_voxels(ray_voxel, node.data[2]);
-            // if voxel_hit_tmp.voxel != 0u && voxel_hit_tmp.dist < last_t {
-            //     voxel_hit = voxel_hit_tmp;
-            //     last_t = voxel_hit_tmp.dist;
-            //     break;
-            // }
-// 
-            // if t > 0.0 {
-            //     voxel_hit.voxel = 1u;
-            // voxel_hit.dist = t;
-            //     break;
-            // } 
-            // voxel_hit.dist = 100.0;
-
-            // node_index = node.data[1];
-            // continue;
-            // return voxel_hit;
-            node_index = node.data[1];
-            continue;
-        }
-
-        let t = intersect_aabb(ray, node.min.xyz, node.max.xyz);
-        if t > 0.0 {
-            prev_node_index = node_index;
-            node_index = node.data[0];
-
-            // if t < last_tt {
-            //     voxel_hit.dist = t;
-            //     last_tt = t;
-            //     prev_node_index = node_index;
-            // }
-        } else {
-            node_index = node.data[1];
-        }
-    }
-
-    return voxel_hit;
-}
-
-
-fn dda_chunks(ray: Ray) -> VoxelHit {
-    var voxel_hit: VoxelHit;
-
-    return voxel_hit;
-}
-
 fn intersect_aabb(ray: Ray, min: vec3<f32>, max: vec3<f32>) -> f32 {
     let bmin = min;
     let bmax = max;
@@ -347,62 +252,6 @@ fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
 }
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
-
-    let hit = traverse_bvh_chunks(ray_in);
-    let color = vec3(hit.dist / 300.0);
-
-    if hit.voxel != 0u {
-        return vec3(color);
-    } else if hit.voxel == 0u && hit.dist != F32_MAX {
-        return vec3(color * vec3(1.0, 0.0, 0.0));
-    } else {
-        return vec3(0.5, 0.0, 0.0);
-    }
-
-
-    // let bvh_chunk_hit = traverse_chunks_bvh(ray_in);
-
-    // if bvh_chunk_hit.hit == false {
-    //     return vec3(0.5, 0.00, 0.00);
-    // }
-
-
-    // var total_dist = 0.0; //bvh_chunk_hit.dist;
-
-    // for (var steps = 0; steps < 64; steps++) {
-    //     let pos = ray_in.orig + ray_in.dir * total_dist;
-
-    //     var chk_dst = F32_MAX;
-    //     // for (var chunk_id = 0u; chunk_id < settings.chunk_count; chunk_id++) {
-
-    //     //     let chunk_pos = chunks[chunk_id].xyz * vec3(36.0, 1.0, 36.0);
-    //     //     let t = sdf_box_sides(chunk_pos - pos);
-
-    //     //     if t > 0.0 && t < chk_dst {
-    //     //         chk_dst = t;
-    //     //     }
-    //     // }
-
-    //     let chunk_pos = chunks[bvh_chunk_hit.offset_index].xyz * vec3(36.0, 1.0, 36.0);
-    //     chk_dst = sdf_box_sides(chunk_pos - pos);
-    //     // let t = sdf_box_sides(chunk_pos - pos);
-
-    //     if chk_dst >= F32_MAX {
-    //         break;
-    //     }
-
-    //     if chk_dst < 0.1 {
-    //         return vec3(0.2, 0.2, 0.5);
-    //     }
-
-    //     if total_dist > 500.0 {
-    //         return vec3(0.05, 0.0, 0.05);
-    //         // break;
-    //     }
-
-    //     total_dist += chk_dst;
-    // }
-
     return vec3(
         0.00,
         0.00,

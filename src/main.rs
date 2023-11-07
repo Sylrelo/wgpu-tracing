@@ -99,7 +99,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [136.0, 226.0, 0.0, 0.0],
+        position: [15.0, 200.0, 15.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
 
@@ -255,7 +255,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     chunks.generate_around(camera.position);
 
-    // exit(1);
+    exit(1);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -336,8 +336,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         chunk_count: chunks.chunks_mem.len() as u32,
                         // chunk_count: chunks.generated_chunks_gpu.len() as u32,
                         player_position: camera.position,
-                        // _padding: 0,
-                        _padding: chunks.generated_chunks_gpubvh.len() as u32,
+                        _padding: 0,
+                        // _padding: chunks.generated_chunks_gpubvh.len() as u32,
                     },
                 );
             }
@@ -351,8 +351,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.config.height = new_size.height;
                 app.surface.configure(&app.device, &app.config);
                 // On macos the window needs to be redrawn manually after resizing
-                tracing_pipeline_new
-                    .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
+                // tracing_pipeline_new
+                //     .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
                 app.window.request_redraw();
             }
 
