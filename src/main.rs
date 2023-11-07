@@ -99,7 +99,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [0.0, 259.0, 0.0, 0.0],
+        position: [136.0, 226.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
 
@@ -251,7 +251,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .unwrap()
         .as_secs();
 
-    let mut last_shader_update: u64 = 0;
+    // let mut last_shader_update: u64 = 0;
+
+    chunks.generate_around(camera.position);
+
+    // exit(1);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -325,9 +329,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 //     .chunk_grid_buffer_update(&app.queue, &chunks.chunks_uniform_grod);
 
                 // println!("{} Hello mofo", input.scancode);
-                chunks.generate_around(camera.position);
-                tracing_pipeline_new
-                    .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
 
                 tracing_pipeline_new.uniform_settings_update(
                     &app.queue,
@@ -350,6 +351,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.config.height = new_size.height;
                 app.surface.configure(&app.device, &app.config);
                 // On macos the window needs to be redrawn manually after resizing
+                tracing_pipeline_new
+                    .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
                 app.window.request_redraw();
             }
 
@@ -361,8 +364,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-                    // tracing_pipeline_new
-                    //     .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
+                    tracing_pipeline_new
+                        .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
 
                     // println!("Camera {:?}", camera.position);
 

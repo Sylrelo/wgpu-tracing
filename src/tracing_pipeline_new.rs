@@ -227,7 +227,7 @@ impl TracingPipelineTest {
         let test_bvh_buffer = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : BVH Buffer"),
             mapped_at_creation: false,
-            size: 2000 * 32,
+            size: 112000 * 32,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 

@@ -3,8 +3,10 @@ use std::{
     time::Instant,
 };
 
-use cgmath::num_traits::Float;
-use noise::{core::simplex::simplex_2d, permutationtable::PermutationTable};
+use noise::{
+    core::simplex::{simplex_2d, simplex_3d},
+    permutationtable::PermutationTable,
+};
 
 static mut PERMTABLE: Option<PermutationTable> = None;
 
@@ -46,14 +48,42 @@ impl ChunkGpuBVHNode {
     }
 }
 
-pub struct ChunkData {
+pub struct VoxelData {
     position: [i32; 3],
     bvh_index: usize,
 }
 
+pub struct ChunkData {
+    position: [i32; 3],
+    offset: u32,
+    bvh_index: usize,
+}
+
+impl bvh::aabb::Bounded for VoxelData {
+    fn aabb(&self) -> bvh::aabb::AABB {
+        bvh::aabb::AABB::with_bounds(
+            bvh::Point3::new(self.position[0] as f32, 0.0, self.position[2] as f32),
+            bvh::Point3::new(
+                1.0 + (self.position[0] as f32),
+                1.0,
+                1.0 + (self.position[2] as f32),
+            ),
+        )
+    }
+}
+
+impl bvh::bounding_hierarchy::BHShape for VoxelData {
+    fn set_bh_node_index(&mut self, index: usize) {
+        self.bvh_index = index;
+    }
+    fn bh_node_index(&self) -> usize {
+        self.bvh_index
+    }
+}
+
 impl bvh::aabb::Bounded for ChunkData {
     fn aabb(&self) -> bvh::aabb::AABB {
-        let uwu = bvh::aabb::AABB::with_bounds(
+        bvh::aabb::AABB::with_bounds(
             bvh::Point3::new(
                 self.position[0] as f32 * CHUNK_X as f32,
                 0.0,
@@ -64,10 +94,7 @@ impl bvh::aabb::Bounded for ChunkData {
                 CHUNK_Y as f32,
                 CHUNK_Z as f32 + (self.position[2] as f32 * CHUNK_Z as f32),
             ),
-        );
-
-        // println!("{:?} - min {:?} max {:?}", self.position, uwu.min, uwu.max);
-        return uwu;
+        )
     }
 }
 
@@ -94,10 +121,44 @@ pub struct Chunk {
     chunks_mem_free: Vec<usize>,
 
     chunk_to_upload: HashSet<usize>,
-
     // test_pos: [f32; 3],
     // last_pos: [f32; 3],
-    pub chunks_uniform_grod: Vec<[u32; 4]>,
+    // pub chunks_uniform_grod: Vec<[u32; 4]>,
+}
+
+pub fn octavia_spencer(
+    point: [f64; 2],
+    iter_max: u32,
+    persistence: f64,
+    scale: f64,
+    min: f64,
+    max: f64,
+) -> f64 {
+    unsafe {
+        if PERMTABLE.is_none() {
+            PERMTABLE = Some(PermutationTable::new(436457824));
+        }
+    }
+    let mut noise = 0.0f64;
+    let mut amp = 1.0f64;
+    let mut freq = scale;
+    let mut max_amp = 0.0f64;
+
+    unsafe {
+        for _ in 0..iter_max {
+            noise +=
+                simplex_2d([(point[0] * freq), (point[1] * freq)], &PERMTABLE.unwrap()).0 * amp;
+            max_amp += amp;
+            amp *= persistence;
+            freq *= 2.0;
+        }
+    }
+
+    noise /= max_amp;
+
+    noise = noise * (max - min) / 2.0 + (max + min) / 2.0;
+
+    return noise;
 }
 
 #[allow(dead_code, unused_variables)]
@@ -114,20 +175,13 @@ impl Chunk {
             chunks_mem_free: Vec::new(),
 
             chunk_to_upload: HashSet::new(),
-
             // test_pos: [0.0, 0.0, 0.0],
             // last_pos: [0.0, 0.0, 0.0],
-            chunks_uniform_grod: Vec::new(),
+            // chunks_uniform_grod: Vec::new(),
         }
     }
 
     pub fn new(&mut self, position: [i32; 4]) {
-        unsafe {
-            if PERMTABLE.is_none() {
-                PERMTABLE = Some(PermutationTable::new(0));
-            }
-        }
-
         // self.generated_chunks.iter().
         // let chunk_offset = self.chunks_mem.len();
 
@@ -151,17 +205,26 @@ impl Chunk {
             // for y in 0..256 {
             for z in 0..CHUNK_Z {
                 unsafe {
-                    let pery = simplex_2d(
-                        [
-                            (position[0] + x as i32) as f64,
-                            (position[2] + z as i32) as f64,
-                        ],
-                        &PERMTABLE.unwrap(),
-                    );
-                    let y = (128.0 - (pery.0 * (CHUNK_Y as f64)))
-                        .ceil()
-                        .min(CHUNK_Y as f64)
-                        .max(0.0) as usize;
+                    let pos = [
+                        (((position[0]) * CHUNK_X as i32 + x as i32) as f64),
+                        (((position[2]) * CHUNK_Z as i32 + z as i32) as f64),
+                    ];
+
+                    // let aled = simplex_3d(point, hasher)
+                    // let pery = simplex_2d(
+                    //     [
+                    //         (position[0] * CHUNK_X as i32 + x as i32) as f64,
+                    //         (position[2] * CHUNK_Z as i32 + z as i32) as f64,
+                    //     ],
+                    //     &PERMTABLE.unwrap(),
+                    // );
+
+                    let y = octavia_spencer(pos, 16, 0.2, 0.006, 0.0, 255.0) as usize;
+
+                    // let y = (64.0 - (pery.0 * ((CHUNK_Y / 2) as f64)))
+                    //     .ceil()
+                    //     .min(CHUNK_Y as f64)
+                    //     .max(0.0) as usize;
 
                     // println!("Y {}", y);/
 
@@ -327,9 +390,10 @@ impl Chunk {
             chunks_as_vecforbvhtest.push(ChunkData {
                 bvh_index: 0,
                 position: [chunk.0[0] as i32, 0, chunk.0[2] as i32],
+                offset: (chunk.1.clone() * CHUNK_TSIZE) as u32,
             });
 
-            // println!("=> {:?}", chunk.0);
+            // println!("=> {:?}", chunk.1);
         }
 
         println!(
@@ -344,8 +408,15 @@ impl Chunk {
         let bvh = bvh::bvh::BVH::build(&mut chunks_as_vecforbvhtest);
 
         let custom_constructor = |aabb: &bvh::aabb::AABB, entry, exit, shape_index| {
-            ChunkGpuBVHNode::new(aabb, entry, exit, shape_index)
+            let index = if entry == 4294967295 {
+                chunks_as_vecforbvhtest[shape_index as usize].offset
+            } else {
+                0
+            };
+
+            ChunkGpuBVHNode::new(aabb, entry, exit, index)
         };
+
         self.generated_chunks_gpubvh.clear();
 
         self.generated_chunks_gpubvh = bvh.flatten_custom(&custom_constructor);
