@@ -10,7 +10,7 @@ static mut PERMTABLE: Option<PermutationTable> = None;
 const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
-const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
+pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
 const CHUNK_RADIUS: i32 = 5;
 
 #[repr(C)]
@@ -86,17 +86,17 @@ pub struct Chunk {
     // chunks: Vec<[i32; 4]>,
     generated_chunks: HashMap<[i32; 4], usize>,
 
-    pub generated_chunks_gpu: Vec<[f32; 4]>,
+    // pub generated_chunks_gpu: Vec<[f32; 4]>,
 
-    pub generated_chunks_gpubvh: Vec<ChunkGpuBVHNode>,
+    // pub generated_chunks_gpubvh: Vec<ChunkGpuBVHNode>,
 
-    chunks_mem: Vec<u32>,
+    pub chunks_mem: Vec<u32>,
     chunks_mem_free: Vec<usize>,
 
     chunk_to_upload: HashSet<usize>,
 
-    test_pos: [f32; 3],
-    last_pos: [f32; 3],
+    // test_pos: [f32; 3],
+    // last_pos: [f32; 3],
 
     pub chunks_uniform_grod: Vec<[u32; 4]>,
 }
@@ -104,21 +104,21 @@ pub struct Chunk {
 #[allow(dead_code, unused_variables)]
 impl Chunk {
     pub fn init() -> Self {
-        Self {
+         Self {
             // chunks: Vec::new(),
             // voxels: Vec::new(),
             generated_chunks: HashMap::new(),
 
-            generated_chunks_gpu: Vec::new(),
-            generated_chunks_gpubvh: Vec::new(),
+            // generated_chunks_gpu: Vec::new(),
+            // generated_chunks_gpubvh: Vec::new(),
 
             chunks_mem: Vec::new(),
             chunks_mem_free: Vec::new(),
 
             chunk_to_upload: HashSet::new(),
 
-            test_pos: [0.0, 0.0, 0.0],
-            last_pos: [0.0, 0.0, 0.0],
+            // test_pos: [0.0, 0.0, 0.0],
+            // last_pos: [0.0, 0.0, 0.0],
 
             chunks_uniform_grod: Vec::new(),
         }
@@ -134,19 +134,22 @@ impl Chunk {
         // self.generated_chunks.iter().
         // let chunk_offset = self.chunks_mem.len();
 
-        // self.chunks_mem.resize(chunk_offset + CHUNK_TSIZE, 0);
 
         let chunk_offset = self.get_free_chunk_memory_zone();
+        // self.chunks_mem.resize(chunk_offset + CHUNK_TSIZE, 0);
 
         self.generated_chunks
             .insert(position, chunk_offset / CHUNK_TSIZE);
 
+            // println!("{}", chunk_offset);
         // println!("Generating {:?}", position);
         // println!(
         //     " - Offset {:?} | Index_offset {:?}",
         //     chunk_offset,
         //     chunk_offset / CHUNK_TSIZE
         // );
+
+        // println!("{}", chunk_offset);
 
         for x in 0..CHUNK_X {
             // for y in 0..256 {
@@ -164,15 +167,30 @@ impl Chunk {
                         .min(CHUNK_Y as f64)
                         .max(0.0) as usize;
 
+                        // println!("Y {}", y);/
+                        
+                    for y in (0..y).rev() {
+                        let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+                        // let index = y * CHUNK_X * CHUNK_Y + z * CHUNK_X + x;
+
+                        // println!("{} {}", y, index);
+                        self.chunks_mem[chunk_offset + index] = 1;
+                        // self.chunks_mem[chunk_offset + index] = 1;
+                        // print!("{:?}", self.chunks_mem[chunk_offset + index]);
+
+                    }
+
                     // self.voxels[voxels_id][x + 36 * (y + 256 * z)] = 1;
 
-                    self.chunks_mem[chunk_offset + (x + 36 * (y + 256 * z))] = 1;
+                    // self.chunks_mem[chunk_offset + (x + 36 * (y + 256 * z))] = 1;
                 }
             }
             // }
         }
+        println!("");
 
         self.chunk_to_upload.insert(chunk_offset / CHUNK_TSIZE);
+
 
         // println!("Chunks to GPU-Update {}", self.chunk_to_upload.len());
     }
@@ -213,24 +231,24 @@ impl Chunk {
         println!("{:?} {:?}", player_pos, player_pos_chunk);
         // if self.test_pos[0] == 0.0
 
-        if player_pos[0] != self.last_pos[0] {
-            self.test_pos[0] += player_pos[0] - self.last_pos[0];
+        // if player_pos[0] != self.last_pos[0] {
+        //     self.test_pos[0] += player_pos[0] - self.last_pos[0];
 
-            if self.test_pos[0].abs() >= 1.0 {
-                self.test_pos[0] = self.test_pos[0].fract()
-            }
+        //     if self.test_pos[0].abs() >= 1.0 {
+        //         self.test_pos[0] = self.test_pos[0].fract()
+        //     }
 
-            self.last_pos[0] = player_pos[0];
-        }
-        if player_pos[2] != self.last_pos[2] {
-            self.test_pos[2] += player_pos[2] - self.last_pos[2];
+        //     self.last_pos[0] = player_pos[0];
+        // }
+        // if player_pos[2] != self.last_pos[2] {
+        //     self.test_pos[2] += player_pos[2] - self.last_pos[2];
 
-            if self.test_pos[2].abs() >= 1.0 {
-                self.test_pos[2] = self.test_pos[2].fract()
-            }
+        //     if self.test_pos[2].abs() >= 1.0 {
+        //         self.test_pos[2] = self.test_pos[2].fract()
+        //     }
 
-            self.last_pos[2] = player_pos[2];
-        }
+        //     self.last_pos[2] = player_pos[2];
+        // }
 
         // for chunk in &self.generated_chunks {
         //     println!("{:?}", chunk);
@@ -255,29 +273,28 @@ impl Chunk {
         // println!("{:?}", self.voxels.len());
         // return ;
 
-        let mut unloaded_chunks = 2;
+        // let mut unloaded_chunks = 2;
+        // let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 7.);
+        // for chunk in farthest_chunks {
+        //     let gen_chunk = self.generated_chunks.get(&chunk);
+        //     let chunk_offset_id = gen_chunk.unwrap().clone();
 
-        let farthest_chunks = self.clean_farthest_chunk(player_pos_chunk, 7.);
-        for chunk in farthest_chunks {
-            let gen_chunk = self.generated_chunks.get(&chunk);
-            let chunk_offset_id = gen_chunk.unwrap().clone();
+        //     for i in chunk_offset_id * CHUNK_TSIZE..(chunk_offset_id + 1) * CHUNK_TSIZE {
+        //         self.chunks_mem[i] = 0;
+        //     }
 
-            for i in chunk_offset_id * CHUNK_TSIZE..(chunk_offset_id + 1) * CHUNK_TSIZE {
-                self.chunks_mem[i] = 0;
-            }
+        //     self.chunks_mem_free.push(chunk_offset_id);
+        //     self.generated_chunks.remove(&chunk);
+        //     unloaded_chunks += 1;
+        // }
 
-            self.chunks_mem_free.push(chunk_offset_id);
-            self.generated_chunks.remove(&chunk);
-            unloaded_chunks += 1;
-        }
-
-        if unloaded_chunks > 0 {
-            println!(
-                "Unloaded chunks : {}. New Total : {}",
-                unloaded_chunks,
-                self.generated_chunks.len()
-            );
-        }
+        // if unloaded_chunks > 0 {
+        //     println!(
+        //         "Unloaded chunks : {}. New Total : {}",
+        //         unloaded_chunks,
+        //         self.generated_chunks.len()
+        //     );
+        // }
 
         self.chunks_uniform_grod.clear();
         self.chunks_uniform_grod.resize(20 * 20, [0, 0, 0, 0]);
@@ -291,7 +308,7 @@ impl Chunk {
                 if chunk.is_some() {
                     // print!("[{:6}] ", chunk.unwrap());
                     self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize] = [
-                        chunk.unwrap().clone() as u32 * CHUNK_TSIZE as u32 + 1,
+                        (chunk.unwrap().clone() as u32 * CHUNK_TSIZE as u32) + 1,
                         0,
                         0,
                         0,
@@ -308,7 +325,7 @@ impl Chunk {
             for x in -10..10 {
                 let chunk = self.chunks_uniform_grod[((x + 10) + ((z + 10) * 20)) as usize];
                 if chunk[0] != 0 {
-                    print!("[{:8}] ", chunk[0]);
+                    print!("[{:8}] ", chunk[0] - 1);
                 } else {
                     print!("[        ] ");
                 }
@@ -320,36 +337,36 @@ impl Chunk {
         println!("");
         println!("{:?}", player_pos);
 
-        let mut chunks_as_vecforbvhtest: Vec<ChunkData> = Vec::new();
+        // let mut chunks_as_vecforbvhtest: Vec<ChunkData> = Vec::new();
 
-        self.generated_chunks_gpu.clear();
-        for chunk in &self.generated_chunks {
-            self.generated_chunks_gpu
-                .push([chunk.0[0] as f32, 0.0, chunk.0[2] as f32, 1.0]);
+        // self.generated_chunks_gpu.clear();
+        // for chunk in &self.generated_chunks {
+        //     self.generated_chunks_gpu
+        //         .push([chunk.0[0] as f32, 0.0, chunk.0[2] as f32, 1.0]);
 
-            chunks_as_vecforbvhtest.push(ChunkData {
-                bvh_index: 0,
-                position: [chunk.0[0] as i32, 0, chunk.0[2] as i32],
-            });
-        }
+        //     chunks_as_vecforbvhtest.push(ChunkData {
+        //         bvh_index: 0,
+        //         position: [chunk.0[0] as i32, 0, chunk.0[2] as i32],
+        //     });
+        // }
         // println!("{:?}", self.generated_chunks_gpu.len());
 
         // let mut chunks_as_vecforbvhtest : Vec<ChunkData> = Vec::new();
 
         // println!("=> {}", chunks_as_vecforbvhtest.len());
 
-        let startbvhtime = Instant::now();
-        let bvh = bvh::bvh::BVH::build(&mut chunks_as_vecforbvhtest);
+        // let startbvhtime = Instant::now();
+        // let bvh = bvh::bvh::BVH::build(&mut chunks_as_vecforbvhtest);
 
-        let custom_constructor = |aabb: &bvh::aabb::AABB, entry, exit, shape_index| {
-            ChunkGpuBVHNode::new(aabb, entry, exit, shape_index)
-        };
-        self.generated_chunks_gpubvh = bvh.flatten_custom(&custom_constructor);
+        // let custom_constructor = |aabb: &bvh::aabb::AABB, entry, exit, shape_index| {
+        //     ChunkGpuBVHNode::new(aabb, entry, exit, shape_index)
+        // };
+        // self.generated_chunks_gpubvh = bvh.flatten_custom(&custom_constructor);
 
-        println!(
-            "Time taken to build Chunk BVH : {} us",
-            startbvhtime.elapsed().as_micros()
-        );
+        // println!(
+        //     "Time taken to build Chunk BVH : {} us",
+        //     startbvhtime.elapsed().as_micros()
+        // );
         // for (index, flat) in self.generated_chunks_gpubvh.iter().enumerate() {
         // println!("{:>10} - {:?} - {:?} ", index, flat.position, flat.data,);
 
@@ -391,6 +408,8 @@ impl Chunk {
         if self.chunks_mem_free.is_empty() {
             let chunk_offset = self.chunks_mem.len();
             self.chunks_mem.resize(chunk_offset + CHUNK_TSIZE, 0);
+            
+            println!("Empty, new size : {} -> {} ", chunk_offset,chunk_offset + CHUNK_TSIZE );
             return chunk_offset;
         }
         let free_zone = self.chunks_mem_free.pop().unwrap() * CHUNK_TSIZE;

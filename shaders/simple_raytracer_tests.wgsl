@@ -2,7 +2,7 @@
 
 struct Settings {
     position: vec4<f32>,
-    chunk_count: u32,
+    chunk_content_count: u32,
     bvh_node_count: u32,
 }
 
@@ -50,6 +50,10 @@ var color_output: texture_storage_2d<rgba8unorm, write>;
 const M_PI = 3.14159265358;
 const M_TWOPI = 6.28318530718;
 const F32_MAX = 3.402823E+38;
+const CHUNK_XMAX = 36;
+const CHUNK_YMAX = 256;
+const CHUNK_ZMAX = 36;
+const CHUNK_TSIZE = CHUNK_XMAX * CHUNK_YMAX * CHUNK_ZMAX;
 
 // UTILITY ===================================================
 
@@ -68,7 +72,13 @@ struct DataDda {
     t: f32,
 }
 
-fn prepare_dda(ray: Ray) -> DataDda {
+struct VoxelHit {
+    dist: f32,
+    normal: vec3<f32>,
+    voxel: u32,
+}
+
+fn dda_prepare(ray: Ray) -> DataDda {
     var dda: DataDda;
 
     dda.map = vec3<i32>(ray.orig);
@@ -122,42 +132,81 @@ fn dda_steps(ray: Ray, dda: ptr<function, DataDda>) {
     }
 }
 
-fn dda_chunks(ray: Ray) -> u32 {
-    var dda: DataDda = prepare_dda(ray);
-    var chunk_offset = 0u;
+fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
+    var voxel_hit: VoxelHit = VoxelHit(0.0, vec3(0.0), 0u);
+    var dda: DataDda = dda_prepare(ray);
 
-    var iter = 0;
-    var d = F32_MAX;
+    var iter = 0u;
 
-    while iter < 1000 {
+    let len = settings.chunk_content_count;
+    if chunk_offset >= len || len <= 0u {
+        voxel_hit.voxel = 666u;
+        return voxel_hit;
+    }
+
+    while iter < 150u {
         iter++;
         dda_steps(ray, &dda);
 
+        let index = i32(chunk_offset) + ((dda.map.z * CHUNK_XMAX * CHUNK_YMAX) + (dda.map.y * CHUNK_XMAX) + dda.map.x);
 
+        if dda.map.x < 0 || dda.map.x >= CHUNK_XMAX || dda.map.y < 0 || dda.map.y >= CHUNK_YMAX || dda.map.z < 0 || dda.map.z >= CHUNK_ZMAX|| index >= i32(len) || index < 0 {
+            voxel_hit.voxel = 777u;
+            continue;
+        }
+
+        // voxel_hit.voxel = chunk_content[
+        //     i32(chunk_offset)+
+        //     (dda.map.y * CHUNK_XMAX * CHUNK_YMAX + dda.map.z * CHUNK_XMAX + dda.map.x)
+        // ];
+
+
+         voxel_hit.voxel = chunk_content[index];
+    }
+
+    return voxel_hit;
+}
+
+
+fn dda_chunks(ray: Ray) -> u32 {
+    var ray_chunk = ray;
+    ray_chunk.orig.y = 0.0;
+
+    var dda: DataDda = dda_prepare(ray_chunk);
+    // var chunk_offset = 0u;
+
+    var voxel_hit: VoxelHit;
+    var iter = 0u;
+
+    while iter < 150u {
+        iter++;
+        dda_steps(ray_chunk, &dda);
+
+
+        // dda.map.y = 0;
         if dda.map.z < 0 || dda.map.z >= 20 || dda.map.x < 0 || dda.map.x >= 20 || dda.map.y != 0 {
             continue;
         }
 
-        chunk_offset = chunks_grid[dda.map.x + 20 * dda.map.z][0];
+        let chunk_offset = chunks_grid[dda.map.x + 20 * dda.map.z][0];
 
-        let pos = ray.orig + ray.dir * (dda.t - 0.005);
-        var ray2: Ray;
+        if chunk_offset == 0u {
+            continue;
+        }
 
-        ray2.orig = pos;
-        ray2.dir = ray.dir;
-        ray2.inv_dir = ray.inv_dir;
-        let t = intersect_aabb(
-            ray2,
-            vec3(f32(dda.map.x), 0.0, f32(dda.map.z)),
-            vec3(f32(dda.map.x) + 36.0, 256.0, f32(dda.map.z) + 36.0),
-        );
+        var r2 = ray;
+        r2.orig.x = 0.0;
+        r2.orig.y = 0.0;
+        r2.orig.z = 0.0;
+        voxel_hit = dda_voxels(r2, u32(i32(chunk_offset) - 1));
 
-        if t > 0.0 && t < d {
-            d = t;
+        if voxel_hit.voxel == 0u {
+            // voxel_hit.voxel = 666u;
+            continue;
         }
     }
 
-    return chunk_offset;
+    return voxel_hit.voxel;
 
     // return chunk_offset != 0u;
 }
@@ -216,85 +265,6 @@ struct BvhHitData {
     position: vec3<f32>,
 }
 
-fn traverse_chunks_bvh(ray: Ray) -> BvhHitData {
-    var dst = F32_MAX;
-    var hit: BvhHitData = BvhHitData(false, F32_MAX, 0u, vec3(0.0));
-    var current_index = 0u;
-    var i = 0;
-
-    while current_index < settings.bvh_node_count {
-        i++;
-        if i > 5000 {
-            break;
-        }
-
-        let node = chunks_bvh[current_index];
-
-        if node.data[0] == 4294967295u {
-            // hit.has_hit = true;
-            // let ray_position = ray.orig + ray.dir * hit.dist;
-
-            // hit.normal = normal_cube(ray_position, vec3(0.0), lastmin, lastmax);
-
-            // if last_t < hit.t {
-            //     hit.t = last_t;
-            // }
-
-            // current_index = node.exit_index;
-            // continue;
-            hit.hit = true;
-            // hit.position = node.min.xyz;
-            current_index = node.data[1];
-            hit.position = node.min.xyz;
-            hit.offset_index = node.data[2];
-
-            break;
-        }
-        // if node.entry_index == 4294967295u && node.shape_index < arrayLength(&voxels) - 1u {
-        //     let current_voxel = voxels[node.shape_index];
-        //     let t = intersect_cube(
-        //         ray,
-        //         current_voxel.min.xyz,
-        //         current_voxel.max.xyz,
-        //         current_voxel.pos.xyz
-        //     );
-
-        //     if t > 0.0 && t < dst {
-        //         hit.has_hit = true;
-        //         hit.t = t;
-        //         hit.tri = i32(node.shape_index);
-        //         dst = t;
-        //     }
-        //     current_index = node.exit_index;
-        //     continue;
-        // }
-
-        let aabb_test_t = intersect_aabb(
-            ray,
-            node.min.xyz,
-            node.max.xyz,
-        );
-
-        if aabb_test_t > 0.0 {
-            current_index = node.data[0];
-
-            if aabb_test_t < hit.dist {
-                hit.dist = aabb_test_t;
-            }
-            // hit.dist = aabb_test_t;
-            // hit.t = aabb_test_t;
-            // lastmax = node.aabb_max.xyz;
-            // lastmin = node.aabb_min.xyz;
-            // last_t = aabb_test_t;
-        } else {
-            current_index = node.data[1];
-        }
-    }
-
-    return hit;
-}
-
-
 fn sdf_box(ray_pos: vec3<f32>) -> f32 {
     let b = vec3(32.0, 1.0, 32.0);
     let p = abs(ray_pos) - b;
@@ -319,59 +289,61 @@ fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
 
+    let allo = dda_chunks(ray_in);
 
-
-    let pute = dda_chunks(ray_in);
-
-    if pute != 0u {
+    if allo == 777u {
+        return vec3(0.2, 0.0, 0.0);
+    } else if allo == 666u {
+        return vec3(0.0, 0.0, 0.2);
+    } else if allo != 0u {
         return vec3(0.2, 0.3, 0.5);
     } else {
         return vec3(0.0, 0.0, 0.0);
     }
 
 
-    let bvh_chunk_hit = traverse_chunks_bvh(ray_in);
+    // let bvh_chunk_hit = traverse_chunks_bvh(ray_in);
 
-    if bvh_chunk_hit.hit == false {
-        return vec3(0.5, 0.00, 0.00);
-    }
+    // if bvh_chunk_hit.hit == false {
+    //     return vec3(0.5, 0.00, 0.00);
+    // }
 
 
-    var total_dist = 0.0; //bvh_chunk_hit.dist;
+    // var total_dist = 0.0; //bvh_chunk_hit.dist;
 
-    for (var steps = 0; steps < 64; steps++) {
-        let pos = ray_in.orig + ray_in.dir * total_dist;
+    // for (var steps = 0; steps < 64; steps++) {
+    //     let pos = ray_in.orig + ray_in.dir * total_dist;
 
-        var chk_dst = F32_MAX;
-        // for (var chunk_id = 0u; chunk_id < settings.chunk_count; chunk_id++) {
+    //     var chk_dst = F32_MAX;
+    //     // for (var chunk_id = 0u; chunk_id < settings.chunk_count; chunk_id++) {
 
-        //     let chunk_pos = chunks[chunk_id].xyz * vec3(36.0, 1.0, 36.0);
-        //     let t = sdf_box_sides(chunk_pos - pos);
+    //     //     let chunk_pos = chunks[chunk_id].xyz * vec3(36.0, 1.0, 36.0);
+    //     //     let t = sdf_box_sides(chunk_pos - pos);
 
-        //     if t > 0.0 && t < chk_dst {
-        //         chk_dst = t;
-        //     }
-        // }
+    //     //     if t > 0.0 && t < chk_dst {
+    //     //         chk_dst = t;
+    //     //     }
+    //     // }
 
-        let chunk_pos = chunks[bvh_chunk_hit.offset_index].xyz * vec3(36.0, 1.0, 36.0);
-        chk_dst = sdf_box_sides(chunk_pos - pos);
-        // let t = sdf_box_sides(chunk_pos - pos);
+    //     let chunk_pos = chunks[bvh_chunk_hit.offset_index].xyz * vec3(36.0, 1.0, 36.0);
+    //     chk_dst = sdf_box_sides(chunk_pos - pos);
+    //     // let t = sdf_box_sides(chunk_pos - pos);
 
-        if chk_dst >= F32_MAX {
-            break;
-        }
+    //     if chk_dst >= F32_MAX {
+    //         break;
+    //     }
 
-        if chk_dst < 0.1 {
-            return vec3(0.2, 0.2, 0.5);
-        }
+    //     if chk_dst < 0.1 {
+    //         return vec3(0.2, 0.2, 0.5);
+    //     }
 
-        if total_dist > 500.0 {
-            return vec3(0.05, 0.0, 0.05);
-            // break;
-        }
+    //     if total_dist > 500.0 {
+    //         return vec3(0.05, 0.0, 0.05);
+    //         // break;
+    //     }
 
-        total_dist += chk_dst;
-    }
+    //     total_dist += chk_dst;
+    // }
 
     return vec3(
         0.00,

@@ -299,13 +299,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 tracing_pipeline_new.uniform_settings_update(
                     &app.queue,
                     TracingPipelineSettings {
-                        chunk_count: chunks.generated_chunks_gpu.len() as u32,
+                        chunk_count: chunks.chunks_mem.len() as u32,
+                        // chunk_count: chunks.generated_chunks_gpu.len() as u32,
                         player_position: camera.position,
-                        _padding: chunks.generated_chunks_gpubvh.len() as u32,
+                        _padding: 0,
+                        // _padding: chunks.generated_chunks_gpubvh.len() as u32,
                     },
                 );
 
                 // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
+                tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 // tracing_pipeline_new
                 //     .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
                 tracing_pipeline_new

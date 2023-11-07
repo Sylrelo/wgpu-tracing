@@ -19,6 +19,7 @@ impl InitWgpu {
         let instance = Instance::new(InstanceDescriptor {
             backends,
             dx12_shader_compiler: Default::default(),
+            
             ..Default::default()
         });
 

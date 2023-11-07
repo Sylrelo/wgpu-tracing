@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::{
-    chunk_generator::ChunkGpuBVHNode,
+    chunk_generator::{ChunkGpuBVHNode, CHUNK_TSIZE},
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
@@ -110,6 +110,14 @@ impl TracingPipelineTest {
         );
     }
 
+    pub fn buffer_chunk_content_update(&self, queue: &Queue, content: &Vec<u32>) {
+        queue.write_buffer(
+            &self.buffers.chunk_content,
+            0,
+            bytemuck::cast_slice(content.as_slice()),
+        );
+    }
+
     pub fn chunk_grid_buffer_update(&self, queue: &Queue, grid: &Vec<[u32; 4]>) {
         queue.write_buffer(
             &self.buffers.test_uniform_grid_chunks,
@@ -203,7 +211,7 @@ impl TracingPipelineTest {
         let chunk_content = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunk Content Buffer"),
             mapped_at_creation: false,
-            size: 1900 * 4,
+            size: (CHUNK_TSIZE * 4 * 300) as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
