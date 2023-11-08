@@ -11,7 +11,7 @@ const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
-const CHUNK_RADIUS: i32 = 5;
+const CHUNK_RADIUS: i32 = 7;
 
 #[allow(dead_code, unused_variables)]
 pub struct Chunk {
@@ -22,10 +22,8 @@ pub struct Chunk {
 
     chunk_to_upload: HashSet<usize>,
 
-
     pub root_chunks: Vec<[i32; 4]>,
-    pub root_grid: Vec<u32>,
-
+    pub root_grid: Vec<[i32; 4]>,
     // uniform_grid: Vec<u32>,
     // generated_chunks_voxs: HashMap<[i32; 3], Vec<u32>>,
 }
@@ -115,10 +113,10 @@ impl Chunk {
         }
 
         self.root_chunks.push([
-            (((position[0]) * CHUNK_X as i32)),
+            ((position[0]) * CHUNK_X as i32),
             0,
-            (((position[2]) * CHUNK_Z as i32 )),
-            0
+            ((position[2]) * CHUNK_Z as i32),
+            0,
         ]);
 
         // self.generated_chunks_voxs
@@ -135,8 +133,6 @@ impl Chunk {
             0,
             (player_pos[2] / CHUNK_Z as f32) as i32,
         ];
-
-        println!("{:?} {:?}", player_pos, player_pos_chunk);
 
         for x in
             player_pos_chunk[0] as i32 - CHUNK_RADIUS..player_pos_chunk[0] as i32 + CHUNK_RADIUS
@@ -167,33 +163,29 @@ impl Chunk {
             );
         }
 
-
-
-        self.root_grid.resize(30*30, 0);
-
-        println!("-> {}", self.root_chunks.len() * 16);
+        self.root_grid.resize(30 * 30, [0; 4]);
 
         for x in 0..30 {
             for z in 0..30 {
-                let chk = self.generated_chunks.get(&[
-                    15- (x),
-                    0,
-                    15- (z),
-                    0
-                    ]);
+                let chk = self.generated_chunks.get(&[15 - (x), 0, 15 - (z), 0]);
                 if chk.is_none() {
                     print!("{:2} {:2} | ", x, z);
-
                 } else {
-                // print!("{:5} | ", self.root_grid[x + z * 20]);
+                    // print!("{:5} | ", self.root_grid[x + z * 20]);
                     let val = chk.unwrap();
                     print!("{:5} | ", val);
-                    self.root_grid[(x + z * 30) as usize] = *val as u32 + 1u32;
-                    
+                    self.root_grid[(x + z * 30) as usize] = [
+                        (15 - (x)) * CHUNK_X as i32,
+                        0,
+                        (15 - (z)) * CHUNK_Z as i32,
+                        *val as i32 + 1,
+                    ];
                 }
             }
             println!("");
         }
+        println!("-> {}", self.root_chunks.len() * 16);
+        println!("{:?} {:?}", player_pos, player_pos_chunk);
 
         // println!("Tot {} ({} ms)", a, start_timer.elapsed().as_millis());
         // let mut unloaded_chunks = 2;

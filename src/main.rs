@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::Path;
 
 use std::process::exit;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
@@ -99,7 +99,8 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [0.0, 265.0, 0.0, 0.0],
+        position: [17.0, 10.0, 38.0, 0.0],
+        // position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
 
@@ -128,8 +129,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     //     camera,
     // )));
     let denoiser_pipeline = Arc::new(Mutex::new(DenoiserPipeline::new(&app.device, &textures)));
-
-    let tracing_pipeline_new = TracingPipelineTest::new(&app.device, &textures);
+    let tracing_pipeline_new =
+        Arc::new(Mutex::new(TracingPipelineTest::new(&app.device, &textures)));
 
     let mut chunks = Chunk::init();
     //////////
@@ -194,52 +195,61 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // let tracing_pipeline1 = tracing_pipeline.clone();
     let denoiser_pipeline1 = denoiser_pipeline.clone();
+    let tracing_pipeline1 = tracing_pipeline_new.clone();
 
-    // let app = app_arc.clone();
-    // let mut watcher = notify::recommended_watcher(move |res| match res {
-    //     Ok(event) => {
-    //         let ev = event as notify::event::Event;
+    let app = app_arc.clone();
+    let mut watcher = notify::recommended_watcher(move |res| match res {
+        Ok(event) => {
+            let ev = event as notify::event::Event;
 
-    //         let now = SystemTime::now()
-    //             .duration_since(UNIX_EPOCH)
-    //             .unwrap()
-    //             .as_secs();
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
 
-    //         if now - last_modified >= 1 && ev.kind.is_modify() {
-    //             thread::sleep(time::Duration::from_millis(50));
-    //             let shader_path = ev.paths[0].clone().to_str().unwrap().to_string();
+            if now - last_modified >= 1 && ev.kind.is_modify() {
+                thread::sleep(time::Duration::from_millis(50));
+                let shader_path = ev.paths[0].clone().to_str().unwrap().to_string();
 
-    //             let shader_module = compile_shader(&app.lock().unwrap().device, &shader_path);
-    //             if let Some(shader_module) = shader_module {
-    //                 println!("Hey {}", shader_path);
-    //                 if shader_path.contains("compute.wgsl") {
-    //                     tracing_pipeline1
-    //                         .lock()
-    //                         .unwrap()
-    //                         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
-    //                     app.lock().unwrap().window.request_redraw();
-    //                     info!("Shader reloaded !");
-    //                 } else if shader_path.contains("denoiser.wgsl") {
-    //                     denoiser_pipeline1
-    //                         .lock()
-    //                         .unwrap()
-    //                         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+                let shader_module = compile_shader(&app.lock().unwrap().device, &shader_path);
+                if let Some(shader_module) = shader_module {
+                    println!("Hey {}", shader_path);
+                    if shader_path.contains("simple_raytracer_tests.wgsl") {
+                        tracing_pipeline1
+                            .lock()
+                            .unwrap()
+                            .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+                        app.lock().unwrap().window.request_redraw();
+                        info!("Shader reloaded !");
+                    }
+                    // if shader_path.contains("compute.wgsl") {
+                    //     tracing_pipeline1
+                    //         .lock()
+                    //         .unwrap()
+                    //         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+                    //     app.lock().unwrap().window.request_redraw();
+                    //     info!("Shader reloaded !");
+                    // } else if shader_path.contains("denoiser.wgsl") {
+                    //     denoiser_pipeline1
+                    //         .lock()
+                    //         .unwrap()
+                    //         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
 
-    //                     app.lock().unwrap().window.request_redraw();
-    //                     info!("Shader reloaded !");
-    //                 }
-    //             }
+                    //     app.lock().unwrap().window.request_redraw();
+                    //     info!("Shader reloaded !");
+                    // }
+                }
 
-    //             last_modified = now;
-    //         }
-    //     }
-    //     Err(e) => println!("watch error: {:?}", e),
-    // })
-    // .unwrap();
+                last_modified = now;
+            }
+        }
+        Err(e) => println!("watch error: {:?}", e),
+    })
+    .unwrap();
 
-    // watcher
-    //     .watch(Path::new("shaders/"), RecursiveMode::NonRecursive)
-    //     .expect("TODO: panic message");
+    watcher
+        .watch(Path::new("shaders/"), RecursiveMode::NonRecursive)
+        .expect("TODO: panic message");
 
     let app = app_arc.clone();
     // let tracing_pipeline = tracing_pipeline.clone();
@@ -261,6 +271,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         let mut app = app.lock().unwrap();
         // let tracing_pipeline = tracing_pipeline.lock().unwrap();
         let _denoiser_pipeline = denoiser_pipeline.lock().unwrap();
+        let tracing_pipeline_new = tracing_pipeline_new.lock().unwrap();
         match event {
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
@@ -284,13 +295,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         camera.position[0] += 1.0;
                     }
                     VirtualKeyCode::R => {
-                        camera.position[1] += 1.0;
+                        camera.position[1] += 5.0;
                     }
                     VirtualKeyCode::F => {
-                        camera.position[1] -= 1.0;
+                        camera.position[1] -= 5.0;
                     }
                     _ => (),
                 }
+
+                println!("{:?}", camera.position);
 
                 // app.queue.write_buffer(
                 //     &tracing_pipeline.uniform_buffer,

@@ -36,7 +36,6 @@ pub struct TracingPipelineBuffers {
 
     pub uniform: Buffer,
 
-
     pub root_grid: Buffer,
     // pub test_bvh_buffer: Buffer,
     // pub test_uniform_grid_chunks: Buffer,
@@ -114,7 +113,7 @@ impl TracingPipelineTest {
         );
     }
 
-    pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<u32>) {
+    pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<[i32; 4]>) {
         queue.write_buffer(
             &self.buffers.root_grid,
             0,
@@ -223,7 +222,7 @@ impl TracingPipelineTest {
         let root_grid = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
             mapped_at_creation: false,
-            size: 30 * 30 * 4,
+            size: 30 * 30 * 16,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
