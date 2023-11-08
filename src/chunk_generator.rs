@@ -11,7 +11,7 @@ const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
-const CHUNK_RADIUS: i32 = 15;
+const CHUNK_RADIUS: i32 = 5;
 
 #[allow(dead_code, unused_variables)]
 pub struct Chunk {
@@ -22,8 +22,12 @@ pub struct Chunk {
 
     chunk_to_upload: HashSet<usize>,
 
-    uniform_grid: Vec<u32>,
-    generated_chunks_voxs: HashMap<[i32; 3], Vec<u32>>,
+
+    pub root_chunks: Vec<[i32; 4]>,
+    pub root_grid: Vec<u32>,
+
+    // uniform_grid: Vec<u32>,
+    // generated_chunks_voxs: HashMap<[i32; 3], Vec<u32>>,
 }
 
 pub fn octavia_spencer(
@@ -77,16 +81,18 @@ impl Chunk {
             // test_pos: [0.0, 0.0, 0.0],
             // last_pos: [0.0, 0.0, 0.0],
             // chunks_uniform_grod: Vec::new(),
-            uniform_grid: Vec::with_capacity(CHUNK_TSIZE * 1225),
-            generated_chunks_voxs: HashMap::new(),
+            // uniform_grid: Vec::with_capacity(CHUNK_TSIZE * 1225),
+            // generated_chunks_voxs: HashMap::new(),
+            root_chunks: Vec::new(),
+            root_grid: Vec::new(),
         }
     }
 
     pub fn new(&mut self, position: [i32; 4]) {
         let chunk_offset = self.get_free_chunk_memory_zone();
 
-        // self.generated_chunks
-        //     .insert(position, chunk_offset / CHUNK_TSIZE);
+        self.generated_chunks
+            .insert(position, chunk_offset / CHUNK_TSIZE);
 
         let mut yo: Vec<u32> = Vec::with_capacity(CHUNK_TSIZE);
         yo.resize(CHUNK_TSIZE, 0u32);
@@ -108,8 +114,15 @@ impl Chunk {
             }
         }
 
-        self.generated_chunks_voxs
-            .insert([position[0], position[1], position[2]], yo);
+        self.root_chunks.push([
+            (((position[0]) * CHUNK_X as i32)),
+            0,
+            (((position[2]) * CHUNK_Z as i32 )),
+            0
+        ]);
+
+        // self.generated_chunks_voxs
+        //     .insert([position[0], position[1], position[2]], yo);
 
         self.chunk_to_upload.insert(chunk_offset / CHUNK_TSIZE);
     }
@@ -132,10 +145,8 @@ impl Chunk {
                 player_pos_chunk[2] as i32 - CHUNK_RADIUS..player_pos_chunk[2] as i32 + CHUNK_RADIUS
             {
                 let pos = [x as i32, 0, z as i32, 0];
-                let pos2 = [x as i32, 0, z as i32];
-                // let pos = [x as i32, 0, z as i32, 0];
 
-                if self.generated_chunks_voxs.contains_key(&pos2) == true {
+                if self.generated_chunks.contains_key(&pos) == true {
                     continue;
                 }
 
@@ -156,95 +167,33 @@ impl Chunk {
             );
         }
 
-        println!("{}", self.uniform_grid.capacity());
-        self.uniform_grid.resize(CHUNK_TSIZE * 1225, 0);
 
-        // let start_timer = Instant::now();
-        // let mut a = 0;
-        // for x in 0..CHUNK_X * 35 {
-        //     for z in 0..CHUNK_Z * 35 {
-        //         for y in 0..CHUNK_Y {
-        //             a += 1;
-        //         }
-        //     }
-        // }
 
-        let chunk_position = [0, 0, 0];
-        let test = self.generated_chunks_voxs.get(&chunk_position).unwrap();
-        // println!("{:?}", test);
+        self.root_grid.resize(30*30, 0);
 
-        let start_ug_creation = Instant::now();
-        for (position, voxel) in &self.generated_chunks_voxs {
-            let real_position = [
-                position[0] * CHUNK_X as i32,
-                position[1],
-                position[2] * CHUNK_Z as i32,
-            ];
+        println!("-> {}", self.root_chunks.len() * 16);
 
-            for (i, v) in voxel.iter().enumerate() {
-                let x = (i % CHUNK_X) as i32;
-                let y = ((i / CHUNK_X) % CHUNK_Y) as i32;
-                let z = (i / (CHUNK_X * CHUNK_Y)) as i32;
+        for x in 0..30 {
+            for z in 0..30 {
+                let chk = self.generated_chunks.get(&[
+                    15- (x),
+                    0,
+                    15- (z),
+                    0
+                    ]);
+                if chk.is_none() {
+                    print!("{:2} {:2} | ", x, z);
 
-                let grid_pos = [
-                    (CHUNK_X * 35 / 2) as i32 + ((real_position[0] + x) - player_pos[0] as i32),
-                    y,
-                    (CHUNK_X * 35 / 2) as i32 + ((real_position[2] + z) - player_pos[2] as i32),
-                ];
-
-                let index = grid_pos[0] as usize
-                    + y as usize * (CHUNK_X * 35usize)
-                    + (grid_pos[2] as usize * CHUNK_X * 35usize * CHUNK_Y);
-                self.uniform_grid[index] = *v;
+                } else {
+                // print!("{:5} | ", self.root_grid[x + z * 20]);
+                    let val = chk.unwrap();
+                    print!("{:5} | ", val);
+                    self.root_grid[(x + z * 30) as usize] = *val as u32 + 1u32;
+                    
+                }
             }
+            println!("");
         }
-        println!(
-            "End UG Creation : {} ms",
-            start_ug_creation.elapsed().as_millis()
-        );
-
-        // for i in 0..CHUNK_TSIZE {
-        //     let real_position = [
-        //         chunk_position[0] * CHUNK_X as i32,
-        //         chunk_position[1],
-        //         chunk_position[2] * CHUNK_Z as i32,
-        //     ];
-
-        //     let x = (i % CHUNK_X) as i32;
-        //     let y = ((i / CHUNK_X) % CHUNK_Y) as i32;
-        //     let z = (i / (CHUNK_X * CHUNK_Y)) as i32;
-
-        //     let grid_pos = [
-        //         (CHUNK_X * 35 / 2) as i32 + ((real_position[0] + x) - player_pos[0] as i32),
-        //         y,
-        //         (CHUNK_X * 35 / 2) as i32 + ((real_position[2] + z) - player_pos[2] as i32),
-        //     ];
-
-        //     let index = grid_pos[0] as usize
-        //         + y as usize * (CHUNK_X * 35usize)
-        //         + (grid_pos[2] as usize * CHUNK_X * 35usize * CHUNK_Y);
-
-        //     self.uniform_grid[index] = test[i];
-
-        // self.generated_chunks_voxs[index] = test[i];
-
-        // println!(
-        //     "{} {}, {} {}, {} {}, {} {}",
-        //     x,
-        //     z,
-        //     real_position[0] + x,
-        //     real_position[2] + z,
-        //     (real_position[0] + x) - player_pos[0] as i32,
-        //     (real_position[2] + z) - player_pos[2] as i32,
-        //     (CHUNK_X * 35 / 2) as i32 + ((real_position[0] + x) - player_pos[0] as i32),
-        //     (CHUNK_X * 35 / 2) as i32 + ((real_position[2] + z) - player_pos[2] as i32),
-        // )
-        // println!("{} = {} {} {}", i, x, y, z,);
-        // }
-
-        // for c in &self.generated_chunks_voxs {
-        //     println!("{:?} ({})", c.0, c.1.len());
-        // }
 
         // println!("Tot {} ({} ms)", a, start_timer.elapsed().as_millis());
         // let mut unloaded_chunks = 2;

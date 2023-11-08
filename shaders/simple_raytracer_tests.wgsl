@@ -3,7 +3,7 @@
 struct Settings {
     position: vec4<f32>,
     chunk_content_count: u32,
-    bvh_node_count: u32,
+    root_chunk_count: u32,
 }
 
 struct Ray {
@@ -34,7 +34,10 @@ var<uniform> settings: Settings;
 var<storage> chunk_content: array<u32>;
 
 @group(1) @binding(1)
-var<storage> chunks: array<vec4<f32>>;
+var<storage> root_chunks: array<vec4<i32>>;
+
+@group(1) @binding(2)
+var<storage> root_grid: array<u32>;
 
 @group(2) @binding(0)
 var color_output: texture_storage_2d<rgba8unorm, write>;
@@ -162,64 +165,60 @@ fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
 }
 
 fn intersect_aabb(ray: Ray, min: vec3<f32>, max: vec3<f32>) -> f32 {
-    let bmin = min;
-    let bmax = max;
+    let t0s = (min - ray.orig) * ray.inv_dir;
+    let t1s = (max - ray.orig) * ray.inv_dir;
 
-    let tx1: f32 = (bmin.x - ray.orig.x) * ray.inv_dir.x;
-    let tx2: f32 = (bmax.x - ray.orig.x) * ray.inv_dir.x;
+    let tsmaller = min(t0s, t1s);
+    let tbigger = max(t0s, t1s);
 
-    var tmin: f32 = min(tx1, tx2);
-    var tmax: f32 = max(tx1, tx2);
+    let tmin = max(tsmaller[0], max(tsmaller[1], tsmaller[2]));
+    let tmax = min(tbigger[0], min(tbigger[1], tbigger[2]));
 
-    let ty1: f32 = (bmin.y - ray.orig.y) * ray.inv_dir.y;
-    let ty2: f32 = (bmax.y - ray.orig.y) * ray.inv_dir.y;
+    // let t = max(tmin, tmax);
 
-    tmin = max(tmin, min(ty1, ty2));
-    tmax = min(tmax, max(ty1, ty2));
-
-    let tz1: f32 = (bmin.z - ray.orig.z) * ray.inv_dir.z;
-    let tz2: f32 = (bmax.z - ray.orig.z) * ray.inv_dir.z;
-
-    tmin = max(tmin, min(tz1, tz2));
-    tmax = min(tmax, max(tz1, tz2));
-
-    let t = max(tmin, tmax);
-
-    if tmax < 0.0 {
-        return 0.0;
-    }
-    if tmin > tmax {
-        return 0.0;
+    if tmin < tmax {
+        return tmin;
     }
 
-    // if tmin < 0.0 {
-    //     return tmax;
-    // } else {
-    //     return tmin;
-    // }
-
-    // if tmax >= tmin {
-    //     return tmin;
-    // }
-
-    return t;
-
-
-    // let t0s = (min - ray.orig) * ray.inv_dir;
-    // let t1s = (max - ray.orig) * ray.inv_dir;
-
-    // let tsmaller = min(t0s, t1s);
-    // let tbigger = max(t0s, t1s);
-
-    // let tmin = max(tsmaller[0], max(tsmaller[1], tsmaller[2]));
-    // let tmax = min(tbigger[0], min(tbigger[1], tbigger[2]));
+    return 0.0;
 
     // if tmin < tmax {
     //     return tmin;
     // }
 
 
-    // return 0.0;
+    // let bmin = min;
+    // let bmax = max;
+
+    // let tx1: f32 = (bmin.x - ray.orig.x) * ray.inv_dir.x;
+    // let tx2: f32 = (bmax.x - ray.orig.x) * ray.inv_dir.x;
+
+    // var tmin: f32 = min(tx1, tx2);
+    // var tmax: f32 = max(tx1, tx2);
+
+    // let ty1: f32 = (bmin.y - ray.orig.y) * ray.inv_dir.y;
+    // let ty2: f32 = (bmax.y - ray.orig.y) * ray.inv_dir.y;
+
+    // tmin = max(tmin, min(ty1, ty2));
+    // tmax = min(tmax, max(ty1, ty2));
+
+    // let tz1: f32 = (bmin.z - ray.orig.z) * ray.inv_dir.z;
+    // let tz2: f32 = (bmax.z - ray.orig.z) * ray.inv_dir.z;
+
+    // tmin = max(tmin, min(tz1, tz2));
+    // tmax = min(tmax, max(tz1, tz2));
+
+    // let t = max(tmin, tmax);
+
+    // if tmax < 0.0 {
+    //     return 0.0;
+    // }
+    // if tmin > tmax {
+    //     return 0.0;
+    // }
+
+    // return t;
+
 }
 
 struct BvhHitData {
@@ -251,7 +250,70 @@ fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
         length(max(vec3(q.x, q.y, p.z), vec3(0.0))) + min(max(q.x, max(q.y, p.z)), 0.0));
 }
 
+fn ug_traverse_root(ray_in: Ray) -> VoxelHit{
+    var hit: VoxelHit;
+    var dda: DataDda = dda_prepare(ray_in);
+
+    var max_iter = 0u;
+
+    var chunk_offset = 0u;
+
+    // dda.delta *= vec3(36.0, 256.0, 36.0);
+
+    while max_iter < 250u && chunk_offset == 0u {
+        max_iter += 1u;
+
+        dda_steps(ray_in, &dda);
+
+        if dda.map.x < 0 || dda.map.x >= 30 || dda.map.y != 0 || dda.map.z < 0 || dda.map.z >= 30 {
+            continue;
+        }
+
+        chunk_offset = root_grid[(dda.map.x / 1) + (dda.map.z / 1) * 30];
+    }
+
+    if chunk_offset != 0u {
+        hit.voxel = 1u;
+    }
+
+    return hit;
+}
+
 fn raytrace(ray_in: Ray) -> vec3<f32> {
+
+    // let vox_hit = ug_traverse_root(ray_in);
+
+    // if vox_hit.voxel != 0u {
+    //     return vec3(0.5);
+    // } else {
+    //     return vec3(0.0);
+    // }
+
+
+    if settings.root_chunk_count == 0u {
+        return vec3(0.05);
+    }
+
+    var dist = F32_MAX;
+
+    for (var i = 0u; i < settings.root_chunk_count; i++) {
+        let curr = root_chunks[i];
+
+        let t = intersect_aabb(
+            ray_in,
+            vec3<f32>(curr.xyz),
+            vec3<f32>(curr.xyz) + vec3(36.0, 256.0, 36.0),
+        );
+        
+        if t > 0.0 && t < dist {
+            dist = t;
+        }
+    }
+
+    if dist != F32_MAX {
+        return vec3(dist / 1000.0);
+    }
+
     return vec3(
         0.00,
         0.00,

@@ -99,7 +99,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [15.0, 200.0, 15.0, 0.0],
+        position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
 
@@ -255,8 +255,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     chunks.generate_around(camera.position);
 
-    exit(1);
-
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
@@ -329,17 +327,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 //     .chunk_grid_buffer_update(&app.queue, &chunks.chunks_uniform_grod);
 
                 // println!("{} Hello mofo", input.scancode);
-
-                tracing_pipeline_new.uniform_settings_update(
-                    &app.queue,
-                    TracingPipelineSettings {
-                        chunk_count: chunks.chunks_mem.len() as u32,
-                        // chunk_count: chunks.generated_chunks_gpu.len() as u32,
-                        player_position: camera.position,
-                        _padding: 0,
-                        // _padding: chunks.generated_chunks_gpubvh.len() as u32,
-                    },
-                );
             }
 
             Event::WindowEvent {
@@ -350,9 +337,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.config.width = new_size.width;
                 app.config.height = new_size.height;
                 app.surface.configure(&app.device, &app.config);
-                // On macos the window needs to be redrawn manually after resizing
-                // tracing_pipeline_new
-                //     .chunk_bvh_buffer_update(&app.queue, &chunks.generated_chunks_gpubvh);
+
+                tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
+
+                tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
+
                 app.window.request_redraw();
             }
 
@@ -364,8 +353,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-                    tracing_pipeline_new
-                        .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
+                    // tracing_pipeline_new
+                    //     .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
 
                     // println!("Camera {:?}", camera.position);
 
@@ -381,7 +370,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                     // app.queue.submit();
 
-                    // println!("FPS: {}", fps);
+                    app.window
+                        .set_title(format!("{:3} FPS - {:3} ms", fps, fps / 1000).as_str());
                     fps = 0;
                     last_time = curr;
                 }
@@ -397,6 +387,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
+
+                tracing_pipeline_new.uniform_settings_update(
+                    &app.queue,
+                    TracingPipelineSettings {
+                        chunk_count: chunks.chunks_mem.len() as u32,
+                        // chunk_count: chunks.generated_chunks_gpu.len() as u32,
+                        player_position: camera.position,
+                        // _padding: 0,
+                        _padding: chunks.root_chunks.len() as u32,
+                    },
+                );
 
                 // let mut caca = app
                 //     .queue

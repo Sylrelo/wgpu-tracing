@@ -35,6 +35,9 @@ pub struct TracingPipelineBuffers {
     pub chunks_size: u32,
 
     pub uniform: Buffer,
+
+
+    pub root_grid: Buffer,
     // pub test_bvh_buffer: Buffer,
     // pub test_uniform_grid_chunks: Buffer,
 }
@@ -95,7 +98,7 @@ impl TracingPipelineTest {
 
     // ===============================
 
-    pub fn chunks_buffer_update(&self, queue: &Queue, chunks: &Vec<[f32; 4]>) {
+    pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
         queue.write_buffer(
             &self.buffers.chunks,
             0,
@@ -108,6 +111,14 @@ impl TracingPipelineTest {
             &self.buffers.chunk_content,
             0,
             bytemuck::cast_slice(content.as_slice()),
+        );
+    }
+
+    pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<u32>) {
+        queue.write_buffer(
+            &self.buffers.root_grid,
+            0,
+            bytemuck::cast_slice(grid.as_slice()),
         );
     }
 
@@ -176,6 +187,8 @@ impl TracingPipelineTest {
             .done()
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             // .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
+            .done()
             // .with_default_buffer_storage(
             //     ShaderStages::COMPUTE,
             //     &buffers.test_uniform_grid_chunks,
@@ -203,7 +216,14 @@ impl TracingPipelineTest {
         let chunks = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
             mapped_at_creation: false,
-            size: 2600 * 8,
+            size: 499 * 16,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
+
+        let root_grid = device.create_buffer(&BufferDescriptor {
+            label: Label::from("Tracing Pipeline : Chunks Buffer"),
+            mapped_at_creation: false,
+            size: 30 * 30 * 4,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
@@ -213,6 +233,8 @@ impl TracingPipelineTest {
             chunks,
             chunks_size: 300 * 8,
             uniform,
+
+            root_grid,
         }
     }
 }
