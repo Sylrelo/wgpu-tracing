@@ -256,10 +256,18 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
                 vec3<f32>(0.0),
                 vec3(36.0, 256.0, 36.0),
             );
+
+
+            let t2 = intersect_aabb(
+                ray_in,
+                vec3<f32>(chunk.xyz),
+                vec3<f32>(chunk.xyz) + vec3(36.0, 256.0, 36.0),
+            );
+
             ray_voxel.orig = ray_voxel.orig + ray_in.dir * t;
 
             if t > 0.0 {
-                hit = dda_voxels(ray_voxel, vec3<f32>(0.0, 0.0, 0.0), u32(chunk.w - 1));
+                hit = dda_voxels(ray_voxel, vec3<f32>(0.0), u32(chunk.w - 1));
                 hit.dist += t;
             }
         }
@@ -297,8 +305,8 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
         //     return vec3(voxel_hit.dist / 100.0);
         // }
 
-        let vox_color = vec3(0.4, 0.3, 0.9);
-        // let vox_color = voxel_hit.normal * 0.5 + 0.5;
+        // let vox_color = vec3(0.4, 0.3, 0.9);
+        let vox_color = voxel_hit.normal * 0.5 + 0.5;
 
         ray.orig = ray_position + voxel_hit.normal * 0.001;
 
@@ -329,17 +337,48 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>) -> vec3<f32> {
 fn raytrace(ray_in: Ray) -> vec3<f32> {
     var ray = ray_in;
 
-    let vox_hit = ug_traverse_root(ray);
-    let t = vox_hit.dist / 550.0;
+//     let vox_hit = ug_traverse_root(ray);
+//     let t = vox_hit.dist / 550.0;
 
-    if vox_hit.voxel != 0u {
-        return vec3(vox_hit.normal * t);
-        // return vec3(vox_hit.dist / 550.0);
-    } else {
-        return vec3((vox_hit.dist / 500.0), 0.0, 0.0);
-        // return vec3(0.01);
+//     if vox_hit.voxel != 0u {
+//         return vec3(vox_hit.normal * t);
+//         // return vec3(vox_hit.dist / 550.0);
+//     } else {
+//         return vec3((vox_hit.dist / 500.0), 0.0, 0.0);
+//         // return vec3(0.01);
+//     }
+
+    var max_t = F32_MAX;
+    var test = array<u32, 5>(0u, 0u, 0u, 0u, 0u);
+
+    for (var i = 0u; i < settings.root_chunk_count; i++) {
+        let chunk = root_chunks[i];
+
+        var skip = false;
+        for (var a = 0u; a < 4u; a++) {
+            if test[a] == i {
+                skip = true;
+            }
+        }
+        if skip == true {
+            continue;
+        }
+
+        let t = intersect_aabb(
+            ray_in,
+            vec3<f32>(chunk.xyz),
+            vec3<f32>(chunk.xyz) + vec3(36.0, 256.0, 36.0),
+        );
+
+        if t > 0.0 && t < max_t {
+            max_t = t;
+            // return vec3(t / 1000.0);
+        }
     }
 
+    if max_t != F32_MAX {
+        return vec3(max_t / 1000.0);
+    }
     return vec3(
         0.00,
         0.00,

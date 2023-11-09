@@ -150,12 +150,12 @@ impl Chunk {
             }
         }
 
-        // self.root_chunks.push([
-        //     ((position[0]) * CHUNK_X as i32),
-        //     0,
-        //     ((position[2]) * CHUNK_Z as i32),
-        //     0,
-        // ]);
+        self.root_chunks.push([
+            ((position[0]) * CHUNK_X as i32),
+            0,
+            ((position[2]) * CHUNK_Z as i32),
+            chunk_offset as i32,
+        ]);
 
         // self.generated_chunks_voxs
         //     .insert([position[0], position[1], position[2]], yo);
