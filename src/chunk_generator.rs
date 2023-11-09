@@ -11,7 +11,7 @@ const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
-const CHUNK_RADIUS: i32 = 7;
+const CHUNK_RADIUS: i32 = 8;
 
 #[allow(dead_code, unused_variables)]
 pub struct Chunk {
@@ -95,18 +95,32 @@ impl Chunk {
         let mut yo: Vec<u32> = Vec::with_capacity(CHUNK_TSIZE);
         yo.resize(CHUNK_TSIZE, 0u32);
 
+        println!("{:?}", position);
+
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
-                let pos = [
-                    (((position[0]) * CHUNK_X as i32 + x as i32) as f64),
-                    (((position[2]) * CHUNK_Z as i32 + z as i32) as f64),
-                ];
+                // let pos = [
+                //     (((position[0]) * CHUNK_X as i32 + x as i32) as f64),
+                //     (((position[2]) * CHUNK_Z as i32 + z as i32) as f64),
+                // ];
 
-                let y = octavia_spencer(pos, 16, 0.2, 0.006, 0.0, 255.0) as usize;
+                // let y = octavia_spencer(pos, 16, 0.2, 0.006, 0.0, 255.0) as usize;
+                let y = ((position[0].abs() * position[0].abs()
+                    + position[2].abs() * position[2].abs()) as i32
+                    + 1 * 16) as usize;
 
+                // let y = if position[0] == 0 && position[2] == 0 {
+                //     50
+                // } else if position[0] == -1 && position[2] == 0 {
+                //     40
+                // } else if position[0] == 0 && position[2] == -1 {
+                //     20
+                // } else {
+                //     1
+                // };
                 for y in (0..y).rev() {
                     let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
-                    // self.chunks_mem[chunk_offset + index] = 1;
+                    self.chunks_mem[chunk_offset + index] = 1;
                     yo[index] = 1;
                 }
             }
@@ -167,18 +181,23 @@ impl Chunk {
 
         for x in 0..30 {
             for z in 0..30 {
-                let chk = self.generated_chunks.get(&[15 - (x), 0, 15 - (z), 0]);
+                let chunk_pos = [15 - (x), 0, 15 - (z), 0];
+
+                let chk = self.generated_chunks.get(&chunk_pos);
+                self.root_grid[(x + z * 30) as usize] = [0, 0, 0, 0];
+
                 if chk.is_none() {
-                    print!("{:2} {:2} | ", x, z);
+                    print!("       | ");
                 } else {
                     // print!("{:5} | ", self.root_grid[x + z * 20]);
                     let val = chk.unwrap();
-                    print!("{:5} | ", val);
+                    // print!("{:8} | ", val * CHUNK_TSIZE + 1);
+                    print!("{:2}  {:2} | ", chunk_pos[0], chunk_pos[2]);
                     self.root_grid[(x + z * 30) as usize] = [
                         (15 - (x)) * CHUNK_X as i32,
                         0,
                         (15 - (z)) * CHUNK_Z as i32,
-                        *val as i32 + 1,
+                        (*val as i32) * CHUNK_TSIZE as i32 + 1,
                     ];
                 }
             }

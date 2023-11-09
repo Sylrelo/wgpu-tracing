@@ -138,11 +138,11 @@ fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
 
     let len = settings.chunk_content_count;
     if chunk_offset >= len || len <= 0u {
-        // voxel_hit.voxel = 666u;
+        // voxel_hit.voxel = 0u;
         return voxel_hit;
     }
 
-    while iter < 150u && voxel_hit.voxel == 0u {
+    while iter < 400u && voxel_hit.voxel == 0u {
         iter++;
         dda_steps(ray, &dda);
 
@@ -159,7 +159,8 @@ fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
         // ];
 
         voxel_hit.voxel = chunk_content[index];
-        voxel_hit.dist = dda.t;
+        voxel_hit.dist = 350.0 - f32(iter) ;
+        // voxel_hit.dist = dda.t;
     }
 
     return voxel_hit;
@@ -182,72 +183,6 @@ fn intersect_aabb(ray: Ray, min: vec3<f32>, max: vec3<f32>) -> f32 {
     }
 
     return 0.0;
-
-    // if tmin < tmax {
-    //     return tmin;
-    // }
-
-
-    // let bmin = min;
-    // let bmax = max;
-
-    // let tx1: f32 = (bmin.x - ray.orig.x) * ray.inv_dir.x;
-    // let tx2: f32 = (bmax.x - ray.orig.x) * ray.inv_dir.x;
-
-    // var tmin: f32 = min(tx1, tx2);
-    // var tmax: f32 = max(tx1, tx2);
-
-    // let ty1: f32 = (bmin.y - ray.orig.y) * ray.inv_dir.y;
-    // let ty2: f32 = (bmax.y - ray.orig.y) * ray.inv_dir.y;
-
-    // tmin = max(tmin, min(ty1, ty2));
-    // tmax = min(tmax, max(ty1, ty2));
-
-    // let tz1: f32 = (bmin.z - ray.orig.z) * ray.inv_dir.z;
-    // let tz2: f32 = (bmax.z - ray.orig.z) * ray.inv_dir.z;
-
-    // tmin = max(tmin, min(tz1, tz2));
-    // tmax = min(tmax, max(tz1, tz2));
-
-    // let t = max(tmin, tmax);
-
-    // if tmax < 0.0 {
-    //     return 0.0;
-    // }
-    // if tmin > tmax {
-    //     return 0.0;
-    // }
-
-    // return t;
-}
-
-struct BvhHitData {
-    hit: bool,
-    dist: f32,
-    offset_index: u32,
-    position: vec3<f32>,
-}
-
-fn sdf_box(ray_pos: vec3<f32>) -> f32 {
-    let b = vec3(32.0, 1.0, 32.0);
-    let p = abs(ray_pos) - b;
-
-    let q = abs(p) - b;
-    return length(max(q, vec3(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
-}
-
-fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
-
-    let e = 0.5;
-    let b = vec3(36.0, 256.0, 36.0);
-    let p = abs(ray_pos) - b;
-    let q = abs(p + e) - e;
-
-    return min(min(
-        length(max(vec3(p.x, q.y, q.z), vec3(0.0))) + min(max(p.x, max(q.y, q.z)), 0.0),
-        length(max(vec3(q.x, p.y, q.z), vec3(0.0))) + min(max(q.x, max(p.y, q.z)), 0.0)
-    ),
-        length(max(vec3(q.x, q.y, p.z), vec3(0.0))) + min(max(q.x, max(q.y, p.z)), 0.0));
 }
 
 fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
@@ -270,7 +205,7 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
 
     var map = vec3(dda.map);
 
-    while max_iter < 300u && chunk_data[3] == 0 {
+    while max_iter < 30u && hit.voxel == 0u {
         max_iter += 1u;
 
         dda_steps(chunk_ray, &dda);
@@ -282,39 +217,31 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
             continue;
         }
         // hit.dist = dda.t;
-        hit.dist = f32(max_iter);
+        hit.dist = 40.0 - f32(max_iter);
 
-        chunk_data = root_grid[u32(f32(map.x)) + u32(f32(map.z)) * 30u];
+        let chunk = root_grid[u32(f32(map.x)) + u32(f32(map.z)) * 30u];
+
+        if chunk.w != 0 {
+            var ray_voxel = ray_in;
+            ray_voxel.orig += vec3<f32>(chunk.xyz)  ;
+
+            hit = dda_voxels(ray_voxel, u32(chunk.w - 1));
+        }
     }
 
-    if chunk_data[3] != 0 {
-        hit.voxel = 1u;
-        hit.dist = pow(1.1, f32(map.x) + f32(map.z));
+    // if chunk_data[3] != 0 {
+    //     hit.voxel = 1u;
+    //     hit.dist = pow(1.1, f32(map.x) + f32(map.z));
 
-        hit.normal = vec3(hit.dist / 500.0);
+    //     hit.normal = vec3(hit.dist / 500.0);
 
-        if map.x == 9 && map.z == 8 {
-            hit.normal = vec3(1.0, 0.0, 1.0);
-        }
+    //     var ray_voxel = ray_in;
 
-        if map.x == 22 && map.z == 21 {
-            hit.normal = vec3(1.0, 1.0, 0.0);
-        }
+    //     ray_voxel.orig = ray_voxel.orig + vec3<f32>(chunk_data.xyz);
 
-        if chunk_data[0] == 0 && chunk_data[1] == 0 && chunk_data[2] == 0 {
-            hit.normal = vec3(1.0, 1.0, 1.0);
-        }
 
-        // let t = intersect_aabb(
-        //     ray_in,
-        //     vec3<f32>(chunk_data.xyz),
-        //     vec3<f32>(chunk_data.xyz) + vec3(36.0, 256.0, 36.0),
-        // );
-
-        // if t > 0.0 {
-        //     hit.voxel = 1u;
-        // }
-    }
+    //     hit = dda_voxels(ray_voxel, u32(chunk_data[3]) - 1u);
+    // }
 
     return hit;
 }
@@ -327,37 +254,37 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     let vox_hit = ug_traverse_root(ray);
 
     if vox_hit.voxel != 0u {
-        return vec3(vox_hit.normal);
-        // return vec3(vox_hit.dist / 100.0);
+        // return vec3(vox_hit.normal);
+        return vec3(vox_hit.dist / 350.0);
     } else {
-        return vec3(vox_hit.dist / 350.0, 0.0, 0.0);
-        // return vec3(0.0);
+        return vec3((vox_hit.dist / 500.0), 0.0, 0.0);
+        // return vec3(0.01);
     }
 
 
-    if settings.root_chunk_count == 0u {
-        return vec3(0.05);
-    }
+    // if settings.root_chunk_count == 0u {
+    //     return vec3(0.05);
+    // }
 
-    var dist = F32_MAX;
+    // var dist = F32_MAX;
 
-    for (var i = 0u; i < settings.root_chunk_count; i++) {
-        let curr = root_chunks[i];
+    // for (var i = 0u; i < settings.root_chunk_count; i++) {
+    //     let curr = root_chunks[i];
 
-        let t = intersect_aabb(
-            ray_in,
-            vec3<f32>(curr.xyz),
-            vec3<f32>(curr.xyz) + vec3(36.0, 256.0, 36.0),
-        );
+    //     let t = intersect_aabb(
+    //         ray_in,
+    //         vec3<f32>(curr.xyz),
+    //         vec3<f32>(curr.xyz) + vec3(36.0, 256.0, 36.0),
+    //     );
 
-        if t > 0.0 && t < dist {
-            dist = t;
-        }
-    }
+    //     if t > 0.0 && t < dist {
+    //         dist = t;
+    //     }
+    // }
 
-    if dist != F32_MAX {
-        return vec3(dist / 1000.0);
-    }
+    // if dist != F32_MAX {
+    //     return vec3(dist / 1000.0);
+    // }
 
     return vec3(
         0.00,

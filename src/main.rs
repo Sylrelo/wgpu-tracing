@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::exit;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::sleep;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
 use bvh::aabb::Bounded;
@@ -354,8 +354,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
 
-                tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
-
                 app.window.request_redraw();
             }
 
@@ -366,9 +364,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .as_secs();
                 fps += 1;
 
-                sleep(Duration::from_millis(33));
+                sleep(Duration::from_millis(6));
 
                 if curr - last_time >= 1 {
+                    tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
+                    tracing_pipeline_new
+                        .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                     // tracing_pipeline_new
                     //     .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
 
