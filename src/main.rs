@@ -7,7 +7,8 @@ use std::path::Path;
 
 use std::process::exit;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread::sleep;
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::{thread, time};
 
 use bvh::aabb::Bounded;
@@ -99,7 +100,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [17.0, 10.0, 38.0, 0.0],
+        position: [0.0, 285.0, 0.0, 0.0],
         // position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
@@ -364,6 +365,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .unwrap()
                     .as_secs();
                 fps += 1;
+
+                sleep(Duration::from_millis(33));
 
                 if curr - last_time >= 1 {
                     // tracing_pipeline_new

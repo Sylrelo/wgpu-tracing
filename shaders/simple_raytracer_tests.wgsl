@@ -75,39 +75,37 @@ struct VoxelHit {
     voxel: u32,
 }
 
-fn dda_prepare(ray: Ray) -> DataDda {
+
+fn dda_prepare(ray: Ray, cell_size: vec3<f32>) -> DataDda {
     var dda: DataDda;
 
-    let voxel_size = vec3(4.0, 1.0, 4.0);
-    let origin = ray.orig / voxel_size;
-
-    dda.map = vec3<i32>(origin);
-    dda.delta = vec3(abs(ray.inv_dir) * voxel_size);
+    dda.map = vec3<i32>(ray.orig / cell_size);
+    dda.delta = vec3(abs(ray.inv_dir) * cell_size);
     dda.step_amount = vec3(0);
     dda.max = vec3(0.0);
 
     if ray.dir.x < 0.0 {
         dda.step_amount.x = -1;
-        dda.max.x = (ray.orig.x - f32(floor(origin.x) * (voxel_size.x))) * dda.delta.x;
+        dda.max.x = ((f32(dda.map.x) * cell_size.x) - ray.orig.x) * ray.inv_dir.x;
     } else if ray.dir.x > 0.0 {
         dda.step_amount.x = 1;
-        dda.max.x = (f32(floor(origin.x) * (voxel_size.x)) + 1.0 - ray.orig.x) * dda.delta.x;
+        dda.max.x = ((f32(dda.map.x + 1) * cell_size.x) - ray.orig.x) * ray.inv_dir.x;
     }
 
     if ray.dir.y < 0.0 {
         dda.step_amount.y = -1;
-        dda.max.y = (ray.orig.y - f32(floor(origin.y) * (voxel_size.y))) * dda.delta.y;
+        dda.max.y = ((f32(dda.map.y) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
     } else if ray.dir.y > 0.0 {
         dda.step_amount.y = 1;
-        dda.max.y = (f32(floor(origin.y) * (voxel_size.y)) + 1.0 - ray.orig.y) * dda.delta.y;
+        dda.max.y = ((f32(dda.map.y + 1) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
     }
 
     if ray.dir.z < 0.0 {
         dda.step_amount.z = -1;
-        dda.max.z = (ray.orig.z - f32(floor(origin.z) * (voxel_size.z))) * dda.delta.z;
+        dda.max.z = ((f32(dda.map.z) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
     } else if ray.dir.z > 0.0 {
         dda.step_amount.z = 1;
-        dda.max.z = (f32(floor(origin.z) * (voxel_size.z)) + 1.0 - ray.orig.z) * dda.delta.z;
+        dda.max.z = ((f32(dda.map.z + 1) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
     }
 
     return dda;
@@ -134,7 +132,7 @@ fn dda_steps(ray: Ray, dda: ptr<function, DataDda>) {
 
 fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
     var voxel_hit: VoxelHit = VoxelHit(F32_MAX, vec3(0.0), 0u);
-    var dda: DataDda = dda_prepare(ray);
+    var dda: DataDda = dda_prepare(ray, vec3(1.0));
 
     var iter = 0u;
 
@@ -254,7 +252,13 @@ fn sdf_box_sides(ray_pos: vec3<f32>) -> f32 {
 
 fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
     var hit: VoxelHit;
-    var dda: DataDda = dda_prepare(ray_in);
+
+    var chunk_ray = ray_in;
+
+    chunk_ray.orig.x += 540.0;
+    chunk_ray.orig.z += 540.0;
+
+    var dda: DataDda = dda_prepare(chunk_ray, vec3(36.0, 256.0, 36.0));
 
     var max_iter = 0u;
 
@@ -266,10 +270,10 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
 
     var map = vec3(dda.map);
 
-    while max_iter < 1000u && chunk_data[3] == 0 {
+    while max_iter < 300u && chunk_data[3] == 0 {
         max_iter += 1u;
 
-        dda_steps(ray_in, &dda);
+        dda_steps(chunk_ray, &dda);
 
         // map = dda.map / vec3(4, 1, 4);
         map = dda.map;
@@ -295,6 +299,10 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
 
         if map.x == 22 && map.z == 21 {
             hit.normal = vec3(1.0, 1.0, 0.0);
+        }
+
+        if chunk_data[0] == 0 && chunk_data[1] == 0 && chunk_data[2] == 0 {
+            hit.normal = vec3(1.0, 1.0, 1.0);
         }
 
         // let t = intersect_aabb(
