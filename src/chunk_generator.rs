@@ -4,8 +4,10 @@ use std::{
 };
 
 use noise::{core::simplex::simplex_2d, permutationtable::PermutationTable};
+use perlin2d::PerlinNoise2D;
 
 static mut PERMTABLE: Option<PermutationTable> = None;
+static mut PERLIN_OBJ: Option<PerlinNoise2D> = None;
 
 const CHUNK_X: usize = 36;
 const CHUNK_Y: usize = 256;
@@ -39,6 +41,18 @@ pub fn octavia_spencer(
     unsafe {
         if PERMTABLE.is_none() {
             PERMTABLE = Some(PermutationTable::new(436457824));
+            // PERLIN_OBJ = Some(PerlinNoise2D::new(
+            //     6,
+            //     10.0,
+            //     0.5,
+            //     1.0,
+            //     2.0,
+            //     (100.0, 100.0),
+            //     1.0,
+            //     1346139461,
+            // ));
+
+            println!("Generating Perm Table");
         }
     }
     let mut noise = 0.0f64;
@@ -92,22 +106,37 @@ impl Chunk {
         self.generated_chunks
             .insert(position, chunk_offset / CHUNK_TSIZE);
 
-        let mut yo: Vec<u32> = Vec::with_capacity(CHUNK_TSIZE);
-        yo.resize(CHUNK_TSIZE, 0u32);
+        // let mut yo: Vec<u32> = Vec::with_capacity(CHUNK_TSIZE);
+        // yo.resize(CHUNK_TSIZE, 0u32);
 
         println!("{:?}", position);
 
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
-                // let pos = [
-                //     (((position[0]) * CHUNK_X as i32 + x as i32) as f64),
-                //     (((position[2]) * CHUNK_Z as i32 + z as i32) as f64),
-                // ];
+                let pos = [
+                    ((position[0] * CHUNK_X as i32 - x as i32) as f64).abs(),
+                    ((position[2] * CHUNK_Z as i32 - z as i32) as f64).abs(),
+                ];
 
-                // let y = octavia_spencer(pos, 16, 0.2, 0.006, 0.0, 255.0) as usize;
-                let y = ((position[0].abs() * position[0].abs()
-                    + position[2].abs() * position[2].abs()) as i32
-                    + 1 * 16) as usize;
+                // let y = octavia_spencer(pos, 2, 0.005, 0.005, 0.0, 255.0) as usize / 2;
+                // unsafe {
+
+                let pepe =
+                    PerlinNoise2D::new(6, 10.0, 0.5, 1.0, 2.0, (100.0, 100.0), 40.0, 1346139461);
+
+                let yp = pepe.get_noise(pos[0], pos[1]);
+
+                let y = (yp as usize).min(256);
+
+                for y in (0..y).rev() {
+                    let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+                    self.chunks_mem[chunk_offset + index] = 1;
+                    // yo[index] = 1;
+                }
+                // }
+                // let y = ((position[0].abs() * position[0].abs()
+                //     + position[2].abs() * position[2].abs()) as i32
+                //     + 1 * 16) as usize;
 
                 // let y = if position[0] == 0 && position[2] == 0 {
                 //     50
@@ -118,20 +147,15 @@ impl Chunk {
                 // } else {
                 //     1
                 // };
-                for y in (0..y).rev() {
-                    let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
-                    self.chunks_mem[chunk_offset + index] = 1;
-                    yo[index] = 1;
-                }
             }
         }
 
-        self.root_chunks.push([
-            ((position[0]) * CHUNK_X as i32),
-            0,
-            ((position[2]) * CHUNK_Z as i32),
-            0,
-        ]);
+        // self.root_chunks.push([
+        //     ((position[0]) * CHUNK_X as i32),
+        //     0,
+        //     ((position[2]) * CHUNK_Z as i32),
+        //     0,
+        // ]);
 
         // self.generated_chunks_voxs
         //     .insert([position[0], position[1], position[2]], yo);
