@@ -364,8 +364,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .as_secs();
                 fps += 1;
 
-                sleep(Duration::from_millis(6));
-
                 if curr - last_time >= 1 {
                     tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
                     tracing_pipeline_new

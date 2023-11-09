@@ -76,36 +76,36 @@ struct VoxelHit {
 }
 
 
-fn dda_prepare(ray: Ray, cell_size: vec3<f32>) -> DataDda {
+fn dda_prepare(ray: Ray, cell_size: vec3<f32>, min_bound: vec3<f32>) -> DataDda {
     var dda: DataDda;
 
-    dda.map = vec3<i32>(ray.orig / cell_size);
+    dda.map = vec3<i32>((ray.orig - min_bound) / cell_size);
     dda.delta = vec3(abs(ray.inv_dir) * cell_size);
     dda.step_amount = vec3(0);
     dda.max = vec3(0.0);
 
     if ray.dir.x < 0.0 {
         dda.step_amount.x = -1;
-        dda.max.x = ((f32(dda.map.x) * cell_size.x) - ray.orig.x) * ray.inv_dir.x;
+        dda.max.x = (min_bound.x + (f32(dda.map.x) * cell_size.x) - ray.orig.x) * ray.inv_dir.x ;
     } else if ray.dir.x > 0.0 {
         dda.step_amount.x = 1;
-        dda.max.x = ((f32(dda.map.x + 1) * cell_size.x) - ray.orig.x) * ray.inv_dir.x;
+        dda.max.x = (min_bound.x + (f32(dda.map.x + 1) * cell_size.x) - ray.orig.x) * ray.inv_dir.x;
     }
 
     if ray.dir.y < 0.0 {
         dda.step_amount.y = -1;
-        dda.max.y = ((f32(dda.map.y) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
+        dda.max.y = (min_bound.y + (f32(dda.map.y) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
     } else if ray.dir.y > 0.0 {
         dda.step_amount.y = 1;
-        dda.max.y = ((f32(dda.map.y + 1) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
+        dda.max.y = (min_bound.y + (f32(dda.map.y + 1) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
     }
 
     if ray.dir.z < 0.0 {
         dda.step_amount.z = -1;
-        dda.max.z = ((f32(dda.map.z) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
+        dda.max.z = (min_bound.z + (f32(dda.map.z) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
     } else if ray.dir.z > 0.0 {
         dda.step_amount.z = 1;
-        dda.max.z = ((f32(dda.map.z + 1) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
+        dda.max.z = (min_bound.z + (f32(dda.map.z + 1) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
     }
 
     return dda;
@@ -130,9 +130,9 @@ fn dda_steps(ray: Ray, dda: ptr<function, DataDda>) {
     }
 }
 
-fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
+fn dda_voxels(ray: Ray, min_bound: vec3<f32>, chunk_offset: u32) -> VoxelHit {
     var voxel_hit: VoxelHit = VoxelHit(F32_MAX, vec3(0.0), 0u);
-    var dda: DataDda = dda_prepare(ray, vec3(1.0));
+    var dda: DataDda = dda_prepare(ray, vec3(1.0), min_bound);
 
     var iter = 0u;
 
@@ -142,7 +142,18 @@ fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
         return voxel_hit;
     }
 
-    while iter < 400u && voxel_hit.voxel == 0u {
+    // if dda.max.x < dda.max.y && dda.max.x < dda.max.z {
+    //     dda.max.x += dda.delta.x * ((starting_offset.x));
+    //     dda.map.x += dda.step_amount.x * i32((starting_offset.x));
+    // } else if dda.max.y < dda.max.z {
+    //     dda.max.y += dda.delta.y * ((starting_offset.y));
+    //     dda.map.y += dda.step_amount.y * i32((starting_offset.y));
+    // } else {
+    //     dda.max.z += dda.delta.z * ((starting_offset.z));
+    //     dda.map.z += dda.step_amount.z * i32((starting_offset.z));
+    // }
+
+    while iter < 100u && voxel_hit.voxel == 0u {
         iter++;
         dda_steps(ray, &dda);
 
@@ -159,7 +170,7 @@ fn dda_voxels(ray: Ray, chunk_offset: u32) -> VoxelHit {
         // ];
 
         voxel_hit.voxel = chunk_content[index];
-        voxel_hit.dist = 350.0 - f32(iter) ;
+        voxel_hit.dist = 100.0 - f32(iter) ;
         // voxel_hit.dist = dda.t;
     }
 
@@ -176,7 +187,7 @@ fn intersect_aabb(ray: Ray, min: vec3<f32>, max: vec3<f32>) -> f32 {
     let tmin = max(tsmaller[0], max(tsmaller[1], tsmaller[2]));
     let tmax = min(tbigger[0], min(tbigger[1], tbigger[2]));
 
-    // let t = max(tmin, tmax);
+    // let t = min(tmin, tmax);
 
     if tmin < tmax {
         return tmin;
@@ -193,17 +204,40 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
     chunk_ray.orig.x += 540.0;
     chunk_ray.orig.z += 540.0;
 
-    var dda: DataDda = dda_prepare(chunk_ray, vec3(36.0, 256.0, 36.0));
+    var dda: DataDda = dda_prepare(chunk_ray, vec3(36.0, 256.0, 36.0), vec3(0.0));
 
     var max_iter = 0u;
-
-    var chunk_data = vec4<i32>(0, 0, 0, 0);
 
     // dda.delta *= vec3(4.0, 256.0, 4.0);
     // dda.step_amount *= vec3(4, 1, 4);
     // dda.max *= vec3(4.0, 256.0, 4.0);
 
-    var map = vec3(dda.map);
+    var max_t = F32_MAX;
+
+    // if true {
+    //     var ray_voxel = ray_in;
+    //     ray_voxel.orig += vec3<f32>(18.0, 0.0, 46.0);
+    //     // hit = dda_voxels(ray_voxel, vec3<f32>(0.0), 0u);
+
+
+    //     let t = intersect_aabb(
+    //         ray_in,
+    //         vec3(-18.0, 0.0, -46.0),
+    //         vec3(-18.0 + 36.0, 256.0, -46.0 + 36.0),
+    //     );
+
+    //     if t > 0.0 {
+    //         ray_voxel.orig = ray_in.orig + ray_in.dir * t;
+
+    //         hit.voxel = 1u;
+    //         hit.dist = t;
+    //         hit = dda_voxels(ray_voxel, vec3<f32>(-18.0, 0.0, -46.0), 0u);
+    //     } else {
+    //         hit.voxel = 0u;
+    //     }
+
+    //     return hit;
+    // }
 
     while max_iter < 30u && hit.voxel == 0u {
         max_iter += 1u;
@@ -211,24 +245,48 @@ fn ug_traverse_root(ray_in: Ray) -> VoxelHit {
         dda_steps(chunk_ray, &dda);
 
         // map = dda.map / vec3(4, 1, 4);
-        map = dda.map;
+        // map = dda.map;
 
-        if map.x < 0 || map.x >= 30 || map.z < 0 || map.z >= 30 || map.y != 0 {
+        if dda.map.x < 0 || dda.map.x >= 30 || dda.map.z < 0 || dda.map.z >= 30 || dda.map.y != 0 {
             continue;
         }
         // hit.dist = dda.t;
-        hit.dist = 40.0 - f32(max_iter);
+        hit.dist = 30.0 - f32(max_iter);
 
-        let chunk = root_grid[u32(f32(map.x)) + u32(f32(map.z)) * 30u];
+        let chunk = root_grid[u32(f32(dda.map.x)) + u32(f32(dda.map.z)) * 30u];
 
         if chunk.w != 0 {
             var ray_voxel = ray_in;
-            ray_voxel.orig += vec3<f32>(chunk.xyz)  ;
+            ray_voxel.orig += vec3<f32>(chunk.xyz);
 
-            hit = dda_voxels(ray_voxel, u32(chunk.w - 1));
+            let t = intersect_aabb(
+                ray_voxel,
+                vec3<f32>(0.0),
+                vec3(36.0, 256.0, 36.0),
+            );
+            ray_voxel.orig = ray_voxel.orig + ray_in.dir * t;
+            // ray_voxel.orig += vec3<f32>(chunk.xyz)  ;
+
+            if t > 0.0 {
+                hit = dda_voxels(ray_voxel, vec3<f32>(0.0, 0.0, 0.0), u32(chunk.w - 1));
+                // max_t = t;
+                // hit.voxel = 1u;
+                // hit.dist = t;
+            }
+            // hit.dist = dda.t;
+            // hit.voxel = 1u;
+            // break;
+            // if t > 0.0 {
+            //     hit.dist = t;
+            //     hit.voxel = 1u;
+            // }
+            // hit.dist = t * 10.0;
         }
     }
 
+    // if max_t != F32_MAX {
+    //     hit.voxel = 1u;
+    // }
     // if chunk_data[3] != 0 {
     //     hit.voxel = 1u;
     //     hit.dist = pow(1.1, f32(map.x) + f32(map.z));
@@ -262,29 +320,26 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     }
 
 
-    // if settings.root_chunk_count == 0u {
-    //     return vec3(0.05);
-    // }
 
-    // var dist = F32_MAX;
+    var dist = F32_MAX;
 
-    // for (var i = 0u; i < settings.root_chunk_count; i++) {
-    //     let curr = root_chunks[i];
+    for (var i = 0u; i < arrayLength(&root_grid); i++) {
+        let curr = root_grid[i];
 
-    //     let t = intersect_aabb(
-    //         ray_in,
-    //         vec3<f32>(curr.xyz),
-    //         vec3<f32>(curr.xyz) + vec3(36.0, 256.0, 36.0),
-    //     );
+        let t = intersect_aabb(
+            ray_in,
+            vec3<f32>(curr.xyz),
+            vec3<f32>(curr.xyz) + vec3(26.0, 256.0, 26.0),
+        );
 
-    //     if t > 0.0 && t < dist {
-    //         dist = t;
-    //     }
-    // }
+        if t > 0.0 && t < dist {
+            dist = t;
+        }
+    }
 
-    // if dist != F32_MAX {
-    //     return vec3(dist / 1000.0);
-    // }
+    if dist != F32_MAX {
+        return vec3(dist / 1000.0);
+    }
 
     return vec3(
         0.00,
