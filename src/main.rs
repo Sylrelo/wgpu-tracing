@@ -353,7 +353,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.surface.configure(&app.device, &app.config);
 
                 tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
-
+                tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
+                tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 app.window.request_redraw();
             }
 
@@ -365,9 +366,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-                    tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
-                    tracing_pipeline_new
-                        .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                     // tracing_pipeline_new
                     //     .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
 
