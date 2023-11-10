@@ -46,6 +46,9 @@ var<storage> chunk_content: array<u32>;
 @group(1) @binding(1)
 var<storage> bvh_root_chunks: array<GpuBvhNode>;
 
+@group(1) @binding(2)
+var<storage> bvh_voxels_chunk: array<GpuBvhNode>;
+
 // @group(1) @binding(1)
 // var<storage> root_chunks: array<vec4<i32>>;
 
@@ -133,7 +136,6 @@ struct VoxelHit {
     normal: vec3<f32>,
     voxel: u32,
 }
-
 
 fn dda_prepare(ray: Ray, cell_size: vec3<f32>, min_bound: vec3<f32>) -> DataDda {
     var dda: DataDda;
@@ -351,52 +353,22 @@ fn precalc_ray(ray: ptr<function, Ray>) {
 
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
-    var ray = ray_in;
-
-    if settings.root_chunk_count == 0u {
-        return vec3(0.05, 0.0, 0.0);
-    }
-
     var node_idx = 0u;
     var prev_t = F32_MAX;
-    var prev_node: GpuBvhNode;
-
     var t_dist = F32_MAX;
-    var offset = 0u;
-    var final_node: GpuBvhNode;
 
-    var voxel_hit: VoxelHit;
-
-    var prev_vox_hit_dist = F32_MAX;
-
-    while node_idx < settings.root_chunk_count {
-        let node = bvh_root_chunks[node_idx];
+    while node_idx < 1000000u { // offset + max_size
+        let node = bvh_voxels_chunk[node_idx];
+        if node.entry == 0u {
+            break;
+        }
 
         if node.entry == 4294967295u {
             node_idx = node.exit;
-
-            // if prev_t < t_dist {
+            if prev_t < t_dist {
                 t_dist = prev_t;
-                offset = node.offset;
-                final_node = prev_node;
-
-                var ray_voxel = ray_in;
-                ray_voxel.orig = ray_voxel.orig + ray_in.dir * prev_t ;
-
-                var hit = dda_voxels(
-                    ray_voxel,
-                    vec3(prev_node.min.xyz),
-                    offset - 1u
-                );
-
-                // hit.dist += prev_t;
-                if hit.voxel != 0u && hit.dist < prev_vox_hit_dist {
-                    prev_vox_hit_dist = hit.dist;
-                    // return vec3(hit.dist / 100.0);
-                }
-            // }
+            }
             continue;
-            // break;
         }
 
         let t = intersect_aabb(
@@ -406,39 +378,106 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
         );
 
         if t > 0.0 {
-            node_idx = node.entry;
+            node_idx = node.entry; // offset + node.entry/exit
             prev_t = t;
-            prev_node = node;
         } else {
-            node_idx = node.exit;
+            node_idx = node.exit; // offset + node.entry/exit
         }
     }
 
-    if prev_vox_hit_dist != F32_MAX {
-        return vec3(prev_vox_hit_dist / 500.0);
+    if t_dist != F32_MAX {
+        return vec3(t_dist / 500.0);
     }
-    if offset != 0u {
-    //     var ray_voxel = ray_in;
-    //     ray_voxel.orig = ray_voxel.orig + ray_in.dir * t_dist;
+    return vec3(0.0);
 
-    //     let hit = dda_voxels(
-    //         ray_voxel,
-    //         vec3(prev_node.min.xyz),
-    //         offset - 1u
+    // var ray = ray_in;
+
+    // if settings.root_chunk_count == 0u {
+    //     return vec3(0.05, 0.0, 0.0);
+    // }
+
+    // var node_idx = 0u;
+    // var prev_t = F32_MAX;
+    // var prev_node: GpuBvhNode;
+
+    // var t_dist = F32_MAX;
+    // var offset = 0u;
+    // var final_node: GpuBvhNode;
+
+    // var voxel_hit: VoxelHit;
+
+    // var prev_vox_hit_dist = F32_MAX;
+
+    // while node_idx < settings.root_chunk_count {
+    //     let node = bvh_root_chunks[node_idx];
+
+    //     if node.entry == 4294967295u {
+    //         node_idx = node.exit;
+
+    //         if prev_t < t_dist {
+    //             t_dist = prev_t;
+    //         // offset = node.offset;
+    //         // final_node = prev_node;
+
+    //         // var ray_voxel = ray_in;
+    //         // ray_voxel.orig = ray_voxel.orig + ray_in.dir * prev_t ;
+
+    //         // var hit = dda_voxels(
+    //         //     ray_voxel,
+    //         //     vec3(prev_node.min.xyz),
+    //         //     offset - 1u
+    //         // );
+
+    //             // hit.dist += prev_t;
+    //         // if hit.voxel != 0u && hit.dist < prev_vox_hit_dist {
+    //         //     prev_vox_hit_dist = hit.dist;
+    //         //         // return vec3(hit.dist / 100.0);
+    //         // }
+    //         }
+    //         continue;
+    //         // break;
+    //     }
+
+    //     let t = intersect_aabb(
+    //         ray_in,
+    //         node.min.xyz,
+    //         node.max.xyz,
     //     );
 
-    //     if hit.voxel != 0u {
-    //         return vec3(hit.dist / 1000.0);
-    //     } 
+    //     if t > 0.0 {
+    //         node_idx = node.entry;
+    //         prev_t = t;
+    //         prev_node = node;
+    //     } else {
+    //         node_idx = node.exit;
+    //     }
+    // }
 
-        // return vec3(t_dist / 1000.0);
-    }
+    // if t_dist != F32_MAX {
+    //     return vec3(t_dist / 500.0);
+    // }
+    // if offset != 0u {
+    // //     var ray_voxel = ray_in;
+    // //     ray_voxel.orig = ray_voxel.orig + ray_in.dir * t_dist;
 
-    return vec3(
-        0.00,
-        0.00,
-        0.00
-    );
+    // //     let hit = dda_voxels(
+    // //         ray_voxel,
+    // //         vec3(prev_node.min.sxyz),
+    // //         offset - 1u
+    // //     );
+
+    // //     if hit.voxel != 0u {
+    // //         return vec3(hit.dist / 1000.0);
+    // //     } 
+
+    //     // return vec3(t_dist / 1000.0);
+    // }
+
+    // return vec3(
+    //     0.00,
+    //     0.00,
+    //     0.00
+    // );
 }
 
 

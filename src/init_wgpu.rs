@@ -47,8 +47,10 @@ impl InitWgpu {
                     label: None,
                     features: wgpu::Features::empty(),
                     limits: Limits {
-                        max_storage_buffer_binding_size: 536870912,
-                        max_buffer_size: 536870912,
+                        max_storage_buffer_binding_size: 2147483647,
+                        max_buffer_size: 2147483647,
+                        // max_storage_buffer_binding_size: 536870912,
+                        // max_buffer_size: 536870912,
                         ..wgpu::Limits::default()
                     },
                 },
@@ -79,8 +81,8 @@ impl InitWgpu {
             format: swapchain_config.format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Immediate,
-            // present_mode: wgpu::PresentMode::AutoVsync,
+            // present_mode: wgpu::PresentMode::Immediate,
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: swapchain_config.capabilities.alpha_modes[0],
             view_formats: vec![],
         }

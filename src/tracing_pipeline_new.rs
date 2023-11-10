@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::{
-    chunk_generator::{CHUNK_TSIZE, GpuBvhNode},
+    chunk_generator::{GpuBvhNode, CHUNK_TSIZE},
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
@@ -33,14 +33,13 @@ pub struct TracingPipelineBuffers {
 
     // pub chunks: Buffer,
     // pub chunks_size: u32,
-
     pub uniform: Buffer,
 
     // pub root_grid: Buffer,
     // pub test_bvh_buffer: Buffer,
     // pub test_uniform_grid_chunks: Buffer,
-
-    pub bvh_chunks: Buffer
+    pub bvh_chunks: Buffer,
+    pub bvh_chunk_voxels: Buffer,
 }
 
 pub struct TracingPipelineTest {
@@ -105,11 +104,19 @@ impl TracingPipelineTest {
     //         0,
     //         bytemuck::cast_slice(chunks.as_slice()),
     //     );
-    // }   
-    
-     pub fn buffer_bvh_chunks_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
+    // }
+
+    pub fn buffer_bvh_chunks_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
         queue.write_buffer(
             &self.buffers.bvh_chunks,
+            0,
+            bytemuck::cast_slice(nodes.as_slice()),
+        );
+    }
+
+    pub fn buffer_bvh_chunk_voxels_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
+        queue.write_buffer(
+            &self.buffers.bvh_chunk_voxels,
             0,
             bytemuck::cast_slice(nodes.as_slice()),
         );
@@ -200,6 +207,8 @@ impl TracingPipelineTest {
             // .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunks, true)
             .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunk_voxels, true)
+            .done()
             // .with_default_buffer_storage(
             //     ShaderStages::COMPUTE,
             //     &buffers.test_uniform_grid_chunks,
@@ -245,6 +254,15 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
+        let bvh_chunk_voxels = device.create_buffer(&BufferDescriptor {
+            label: Label::from("Tracing Pipeline : bvh_chunk_voxels Buffer"),
+            mapped_at_creation: false,
+            size: 2147483640,
+
+            // 3072000000 / (1000000 * 48) = 64
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
+
         TracingPipelineBuffers {
             chunk_content,
             chunk_content_size: 900 * 4,
@@ -253,8 +271,8 @@ impl TracingPipelineTest {
             uniform,
 
             // root_grid,
-
-            bvh_chunks
+            bvh_chunks,
+            bvh_chunk_voxels,
         }
     }
 }
