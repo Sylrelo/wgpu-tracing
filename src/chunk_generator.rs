@@ -18,7 +18,7 @@ const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
 pub const CHUNK_MEM_OFFSET: usize = 1000000; // 995326;
-const CHUNK_RADIUS: i32 = 4;
+const CHUNK_RADIUS: i32 = 6;
 
 pub struct VoxelGenerated {
     chunk_position: [i32; 3],
@@ -169,8 +169,8 @@ impl Chunk {
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
                 let pos = [
-                    ((position[0] * CHUNK_X as i32 - x as i32) as f64).abs(),
-                    ((position[2] * CHUNK_Z as i32 - z as i32) as f64).abs(),
+                    ((position[0] * CHUNK_X as i32 + x as i32) as f64).abs(),
+                    ((position[2] * CHUNK_Z as i32 + z as i32) as f64).abs(),
                 ];
 
                 // let y = octavia_spencer(pos, 2, 0.005, 0.005, 0.0, 255.0) as usize / 2;
@@ -265,7 +265,7 @@ impl Chunk {
                 (position[1] * CHUNK_Y as i32) as f32,
                 (position[2] * CHUNK_Z as i32) as f32,
             ],
-            offset: (chunk_offset as u32) + 1,
+            offset: (chunk_offset as u32),
             node_index: 0,
             voxels: Vec::new(),
         });

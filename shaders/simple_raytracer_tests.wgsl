@@ -371,6 +371,7 @@ fn traverse_voxels(ray_in: Ray, offset: u32) -> f32 {
             if prev_t < t_dist {
                 t_dist = prev_t;
             }
+            // break;
             continue;
         }
 
@@ -392,7 +393,7 @@ fn traverse_voxels(ray_in: Ray, offset: u32) -> f32 {
 }
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
-    // let vo_dst = traverse_voxels(ray_in, MEM_SIZE * 4u);
+    // let vo_dst = traverse_voxels(ray_in, 4000001u - 1u);
     // if vo_dst != F32_MAX {
     //     return vec3(vo_dst / 500.0);
     // } else {
@@ -422,17 +423,18 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     while node_idx < settings.root_chunk_count {
         let node = bvh_root_chunks[node_idx];
 
-        if node.entry == 4294967295u && node.offset != 0u {
+        if node.entry == 4294967295u {
             node_idx = node.exit;
 
             // if prev_t < t_dist {
             t_dist = prev_t;
 
-            let d = traverse_voxels(ray_in, node.offset - 1u);
+            let d = traverse_voxels(ray_in, node.offset);
 
             if d < vox_dist_t {
                 vox_dist_t = d;
             }
+            // break;
             // offset = node.offset;
             // final_node = prev_node;
 
