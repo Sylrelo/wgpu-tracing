@@ -31,7 +31,6 @@ pub struct ChunkGenerated {
     position: [f32; 3],
     offset: u32,
     node_index: usize,
-    voxels: Vec<VoxelGenerated>,
 }
 
 #[repr(C)]
@@ -44,6 +43,30 @@ pub struct GpuBvhNode {
     pub offset: u32,
     pub _padding: u32,
 }
+
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct VoxelBvhNode {
+    pub entry: u32,
+    pub exit: u32,
+    pub position_n_type: u32,
+    pub _padding: u32,
+}
+
+
+// impl VoxelBvhNode {
+//     pub fn new(aabb: &AABB, entry: u32, exit: u32, offset: u32) -> Self {
+//         Self {
+//             min: [aabb.min.x, aabb.min.y, aabb.min.z, 0.0],
+//             max: [aabb.max.x, aabb.max.y, aabb.max.z, 0.0],
+//             entry,
+//             exit,
+//             offset,
+//             _padding: 0,
+//         }
+//     }
+// }
 
 impl GpuBvhNode {
     pub fn new(aabb: &AABB, entry: u32, exit: u32, offset: u32) -> Self {
@@ -89,11 +112,11 @@ impl Bounded for VoxelGenerated {
         ];
 
         AABB::with_bounds(
-            Point3::new(position[0] as f32, position[1] as f32, position[2] as f32),
+            Point3::new(self.position[0] as f32, self.position[1] as f32, self.position[2] as f32),
             Point3::new(
-                position[0] as f32 + 1.0,
-                position[1] as f32 + 1.0,
-                position[2] as f32 + 1.0,
+                self.position[0] as f32 + 1.0,
+                self.position[1] as f32 + 1.0,
+                self.position[2] as f32 + 1.0,
             ),
         )
     }
@@ -124,6 +147,7 @@ pub struct Chunk {
     bvh_generated_chunks: Vec<ChunkGenerated>,
     pub bvh_chunks: Vec<GpuBvhNode>,
     pub bvh_chunk_voxels: Vec<GpuBvhNode>,
+    pub bvh_chunk_voxels_bitwise: Vec<VoxelBvhNode>,
 }
 
 #[allow(dead_code, unused_variables)]
@@ -150,6 +174,7 @@ impl Chunk {
             bvh_generated_chunks: Vec::new(),
             bvh_chunks: Vec::new(),
             bvh_chunk_voxels: Vec::new(),
+            bvh_chunk_voxels_bitwise: Vec::new()
         }
     }
 
@@ -267,12 +292,12 @@ impl Chunk {
             ],
             offset: (chunk_offset as u32),
             node_index: 0,
-            voxels: Vec::new(),
         });
 
         for (index, voxel) in bvh_voxel_flatten.iter().enumerate() {
             self.bvh_chunk_voxels[chunk_offset + index] = voxel.clone();
         }
+
         // self.bvh_chunk_voxels.cop
         // self.generated_chunks_voxs
         //     .insert([position[0], position[1], position[2]], yo);
@@ -328,7 +353,6 @@ impl Chunk {
 
         self.bvh_chunks = bvh_chunk.flatten_custom(&custom_constructor);
 
-        println!("{}", self.bvh_chunk_voxels.len());
 
         // for (index, node) in self.bvh_chunk_voxels.iter().enumerate() {
         //     if node.entry == 0 {
@@ -346,6 +370,11 @@ impl Chunk {
                 index, node.entry, node.exit, node.offset, node.min, node.max
             );
         }
+        println!("{}", self.generated_chunks.len());
+        println!("{}", self.bvh_chunks.len());
+        println!("{}", self.bvh_chunk_voxels.len());
+        println!("{}", self.bvh_chunk_voxels.len() * std::mem::size_of::<GpuBvhNode>());
+        println!("{}", self.bvh_chunk_voxels.len() * 16);
 
         // println!(
         //     "{} {} ",

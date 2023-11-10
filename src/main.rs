@@ -511,6 +511,30 @@ fn main() {
 
     println!("Internal resolution : {} x {}", INTERNAL_W, INTERNAL_H);
 
+    // Max node_index for 36x256x36 chunk size : 995326
+    // Max: 1048575 | << 12 | 0xfffff
+
+    // theorical max different chunk : 511
+    // 511 | << 9 | 0x1ff
+
+
+    // let test = 1048575 << 12; // node entry | ??
+    // let test2 = 1048575 << 12; // node exit | ??
+
+    // //         331776
+    // let test3 = 524287 << 13 | 511 << 4; // voxel position relative to chunk | voxel type
+    
+    // println!("{:b}", test);
+    // println!("{:b}", test2);
+    // println!("{:b}", test3);
+
+    // exit(0);
+    // 19
+    // 6 + 6 + 8
+
+    // 11111111111111111110000000000000
+    // 11111111111111111111000000000000
+
     // let mut chunks = Chunk::init();
 
     // chunks.new([0, 0, 0, 0]);
@@ -637,6 +661,9 @@ fn main() {
     // if let Err(e) = device.get_error() {
     //     println!("Error denosing image: {}", e.1);
     // }
+
+
+
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
