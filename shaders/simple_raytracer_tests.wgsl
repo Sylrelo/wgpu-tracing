@@ -351,20 +351,23 @@ fn precalc_ray(ray: ptr<function, Ray>) {
 //     return color;
 // }
 
+const MEM_SIZE: u32 = 1000000u;
 
-fn raytrace(ray_in: Ray) -> vec3<f32> {
-    var node_idx = 0u;
+fn traverse_voxels(ray_in: Ray, offset: u32) -> f32 {
+    var node_idx = offset;
     var prev_t = F32_MAX;
     var t_dist = F32_MAX;
 
-    while node_idx < 1000000u { // offset + max_size
+    while node_idx < (offset + MEM_SIZE) && node_idx < arrayLength(&bvh_voxels_chunk) { // offset + max_size
         let node = bvh_voxels_chunk[node_idx];
+
         if node.entry == 0u {
             break;
         }
 
         if node.entry == 4294967295u {
-            node_idx = node.exit;
+            node_idx = offset + node.exit;
+
             if prev_t < t_dist {
                 t_dist = prev_t;
             }
@@ -378,17 +381,23 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
         );
 
         if t > 0.0 {
-            node_idx = node.entry; // offset + node.entry/exit
+            node_idx = offset + node.entry;
             prev_t = t;
         } else {
-            node_idx = node.exit; // offset + node.entry/exit
+            node_idx = offset + node.exit;
         }
     }
 
-    if t_dist != F32_MAX {
-        return vec3(t_dist / 500.0);
-    }
-    return vec3(0.0);
+    return t_dist;
+}
+
+fn raytrace(ray_in: Ray) -> vec3<f32> {
+    // let vo_dst = traverse_voxels(ray_in, MEM_SIZE * 4u);
+    // if vo_dst != F32_MAX {
+    //     return vec3(vo_dst / 500.0);
+    // } else {
+    //     return vec3(0.0);
+    // }
 
     // var ray = ray_in;
 
@@ -396,88 +405,101 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     //     return vec3(0.05, 0.0, 0.0);
     // }
 
-    // var node_idx = 0u;
-    // var prev_t = F32_MAX;
-    // var prev_node: GpuBvhNode;
+    var node_idx = 0u;
+    var prev_t = F32_MAX;
+    var prev_node: GpuBvhNode;
 
-    // var t_dist = F32_MAX;
-    // var offset = 0u;
-    // var final_node: GpuBvhNode;
+    var t_dist = F32_MAX;
+    var offset = 0u;
+    var final_node: GpuBvhNode;
 
-    // var voxel_hit: VoxelHit;
+    var voxel_hit: VoxelHit;
 
-    // var prev_vox_hit_dist = F32_MAX;
+    var prev_vox_hit_dist = F32_MAX;
 
-    // while node_idx < settings.root_chunk_count {
-    //     let node = bvh_root_chunks[node_idx];
+    var vox_dist_t = F32_MAX;
 
-    //     if node.entry == 4294967295u {
-    //         node_idx = node.exit;
+    while node_idx < settings.root_chunk_count {
+        let node = bvh_root_chunks[node_idx];
 
-    //         if prev_t < t_dist {
-    //             t_dist = prev_t;
-    //         // offset = node.offset;
-    //         // final_node = prev_node;
+        if node.entry == 4294967295u && node.offset != 0u {
+            node_idx = node.exit;
 
-    //         // var ray_voxel = ray_in;
-    //         // ray_voxel.orig = ray_voxel.orig + ray_in.dir * prev_t ;
+            // if prev_t < t_dist {
+            t_dist = prev_t;
 
-    //         // var hit = dda_voxels(
-    //         //     ray_voxel,
-    //         //     vec3(prev_node.min.xyz),
-    //         //     offset - 1u
-    //         // );
+            let d = traverse_voxels(ray_in, node.offset - 1u);
 
-    //             // hit.dist += prev_t;
-    //         // if hit.voxel != 0u && hit.dist < prev_vox_hit_dist {
-    //         //     prev_vox_hit_dist = hit.dist;
-    //         //         // return vec3(hit.dist / 100.0);
-    //         // }
-    //         }
-    //         continue;
-    //         // break;
-    //     }
+            if d < vox_dist_t {
+                vox_dist_t = d;
+            }
+            // offset = node.offset;
+            // final_node = prev_node;
 
-    //     let t = intersect_aabb(
-    //         ray_in,
-    //         node.min.xyz,
-    //         node.max.xyz,
+            // var ray_voxel = ray_in;
+            // ray_voxel.orig = ray_voxel.orig + ray_in.dir * prev_t ;
+
+            // var hit = dda_voxels(
+            //     ray_voxel,
+            //     vec3(prev_node.min.xyz),
+            //     offset - 1u
+            // );
+
+                // hit.dist += prev_t;
+            // if hit.voxel != 0u && hit.dist < prev_vox_hit_dist {
+            //     prev_vox_hit_dist = hit.dist;
+            //         // return vec3(hit.dist / 100.0);
+            // }
+            // }
+            continue;
+            // break;
+        }
+
+        let t = intersect_aabb(
+            ray_in,
+            node.min.xyz,
+            node.max.xyz,
+        );
+
+        if t > 0.0 {
+            node_idx = node.entry;
+            prev_t = t;
+            prev_node = node;
+        } else {
+            node_idx = node.exit;
+        }
+    }
+
+    if vox_dist_t != F32_MAX {
+        return vec3(vox_dist_t / 1000.0);
+    }
+
+    if t_dist != F32_MAX {
+        return vec3(t_dist / 1500.0, 0.0, 0.0);
+    }
+
+    if offset != 0u {
+    //     var ray_voxel = ray_in;
+    //     ray_voxel.orig = ray_voxel.orig + ray_in.dir * t_dist;
+
+    //     let hit = dda_voxels(
+    //         ray_voxel,
+    //         vec3(prev_node.min.sxyz),
+    //         offset - 1u
     //     );
 
-    //     if t > 0.0 {
-    //         node_idx = node.entry;
-    //         prev_t = t;
-    //         prev_node = node;
-    //     } else {
-    //         node_idx = node.exit;
-    //     }
-    // }
+    //     if hit.voxel != 0u {
+    //         return vec3(hit.dist / 1000.0);
+    //     } 
 
-    // if t_dist != F32_MAX {
-    //     return vec3(t_dist / 500.0);
-    // }
-    // if offset != 0u {
-    // //     var ray_voxel = ray_in;
-    // //     ray_voxel.orig = ray_voxel.orig + ray_in.dir * t_dist;
+        // return vec3(t_dist / 1000.0);
+    }
 
-    // //     let hit = dda_voxels(
-    // //         ray_voxel,
-    // //         vec3(prev_node.min.sxyz),
-    // //         offset - 1u
-    // //     );
-
-    // //     if hit.voxel != 0u {
-    // //         return vec3(hit.dist / 1000.0);
-    // //     } 
-
-    //     // return vec3(t_dist / 1000.0);
-    // }
-
-    // return vec3(
-    //     0.00,
-    //     0.00,
-    //     0.00
-    // );
+    return vec3(
+        0.00,
+        0.00,
+        0.00
+    );
 }
 
 

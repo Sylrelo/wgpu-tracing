@@ -18,7 +18,7 @@ const CHUNK_Y: usize = 256;
 const CHUNK_Z: usize = 36;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
 pub const CHUNK_MEM_OFFSET: usize = 1000000; // 995326;
-const CHUNK_RADIUS: i32 = 2;
+const CHUNK_RADIUS: i32 = 4;
 
 pub struct VoxelGenerated {
     chunk_position: [i32; 3],
@@ -202,7 +202,8 @@ impl Chunk {
                             0,
                             ((position[2]) * CHUNK_Z as i32),
                         ],
-                        position: [pos[0] as u32, y as u32, pos[1] as u32],
+                        // position: [pos[0] as u32, y as u32, pos[1] as u32],
+                        position: [x as u32, y as u32, z as u32],
                         voxel_type: 1,
                         node_index: 0,
                     })
@@ -266,7 +267,7 @@ impl Chunk {
             ],
             offset: (chunk_offset as u32) + 1,
             node_index: 0,
-            voxels: voxels_gen,
+            voxels: Vec::new(),
         });
 
         for (index, voxel) in bvh_voxel_flatten.iter().enumerate() {
@@ -288,12 +289,8 @@ impl Chunk {
             (player_pos[2] / CHUNK_Z as f32) as i32,
         ];
 
-        for x in
-            player_pos_chunk[0] as i32 - CHUNK_RADIUS..player_pos_chunk[0] as i32 + CHUNK_RADIUS
-        {
-            for z in
-                player_pos_chunk[2] as i32 - CHUNK_RADIUS..player_pos_chunk[2] as i32 + CHUNK_RADIUS
-            {
+        for x in player_pos_chunk[0] as i32..player_pos_chunk[0] as i32 + CHUNK_RADIUS {
+            for z in player_pos_chunk[2] as i32..player_pos_chunk[2] as i32 + CHUNK_RADIUS {
                 let pos = [x as i32, 0, z as i32, 0];
 
                 if self.generated_chunks.contains_key(&pos) == true {
@@ -343,12 +340,12 @@ impl Chunk {
         //     );
         // }
 
-        // for (index, node) in self.bvh_chunks.iter().enumerate() {
-        //     println!(
-        //         "{:5} - {:11} {:11} | {:11} | {:?} {:?}",
-        //         index, node.entry, node.exit, node.offset, node.min, node.max
-        //     );
-        // }
+        for (index, node) in self.bvh_chunks.iter().enumerate() {
+            println!(
+                "{:5} - {:11} {:11} | {:11} | {:?} {:?}",
+                index, node.entry, node.exit, node.offset, node.min, node.max
+            );
+        }
 
         // println!(
         //     "{} {} ",
