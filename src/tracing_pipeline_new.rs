@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::{
-    chunk_generator::CHUNK_TSIZE,
+    chunk_generator::{CHUNK_TSIZE, GpuBvhNode},
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
@@ -31,14 +31,16 @@ pub struct TracingPipelineBuffers {
     pub chunk_content: Buffer,
     pub chunk_content_size: u32,
 
-    pub chunks: Buffer,
-    pub chunks_size: u32,
+    // pub chunks: Buffer,
+    // pub chunks_size: u32,
 
     pub uniform: Buffer,
 
-    pub root_grid: Buffer,
+    // pub root_grid: Buffer,
     // pub test_bvh_buffer: Buffer,
     // pub test_uniform_grid_chunks: Buffer,
+
+    pub bvh_chunks: Buffer
 }
 
 pub struct TracingPipelineTest {
@@ -97,11 +99,19 @@ impl TracingPipelineTest {
 
     // ===============================
 
-    pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
+    // pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
+    //     queue.write_buffer(
+    //         &self.buffers.chunks,
+    //         0,
+    //         bytemuck::cast_slice(chunks.as_slice()),
+    //     );
+    // }   
+    
+     pub fn buffer_bvh_chunks_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
         queue.write_buffer(
-            &self.buffers.chunks,
+            &self.buffers.bvh_chunks,
             0,
-            bytemuck::cast_slice(chunks.as_slice()),
+            bytemuck::cast_slice(nodes.as_slice()),
         );
     }
 
@@ -113,13 +123,13 @@ impl TracingPipelineTest {
         );
     }
 
-    pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<[i32; 4]>) {
-        queue.write_buffer(
-            &self.buffers.root_grid,
-            0,
-            bytemuck::cast_slice(grid.as_slice()),
-        );
-    }
+    // pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<[i32; 4]>) {
+    //     queue.write_buffer(
+    //         &self.buffers.root_grid,
+    //         0,
+    //         bytemuck::cast_slice(grid.as_slice()),
+    //     );
+    // }
 
     pub fn uniform_settings_update(&self, queue: &Queue, settings: TracingPipelineSettings) {
         queue.write_buffer(&self.buffers.uniform, 0, bytemuck::cast_slice(&[settings]));
@@ -182,11 +192,13 @@ impl TracingPipelineTest {
         BindingGeneratorBuilder::new(device)
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunk_content, true)
             .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunks, true)
-            .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunks, true)
+            // .done()
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             // .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
+            // .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunks, true)
             .done()
             // .with_default_buffer_storage(
             //     ShaderStages::COMPUTE,
@@ -212,28 +224,37 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
-        let chunks = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : Chunks Buffer"),
-            mapped_at_creation: false,
-            size: 499 * 16,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        // let chunks = device.create_buffer(&BufferDescriptor {
+        //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
+        //     mapped_at_creation: false,
+        //     size: 499 * 16,
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
-        let root_grid = device.create_buffer(&BufferDescriptor {
+        // let root_grid = device.create_buffer(&BufferDescriptor {
+        //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
+        //     mapped_at_creation: false,
+        //     size: 30 * 30 * 16,
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
+
+        let bvh_chunks = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
             mapped_at_creation: false,
-            size: 30 * 30 * 16,
+            size: 40000,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
         TracingPipelineBuffers {
             chunk_content,
             chunk_content_size: 900 * 4,
-            chunks,
-            chunks_size: 300 * 8,
+            // chunks,
+            // chunks_size: 300 * 8,
             uniform,
 
-            root_grid,
+            // root_grid,
+
+            bvh_chunks
         }
     }
 }

@@ -352,8 +352,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.config.height = new_size.height;
                 app.surface.configure(&app.device, &app.config);
 
-                tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
-                tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
+                tracing_pipeline_new.buffer_bvh_chunks_update(&app.queue, &chunks.bvh_chunks);
+                // tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
+                // tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
                 tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 app.window.request_redraw();
             }
@@ -408,7 +409,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         // chunk_count: chunks.generated_chunks_gpu.len() as u32,
                         player_position: camera.position,
                         // _padding: 0,
-                        _padding: chunks.root_chunks.len() as u32,
+                        _padding: chunks.bvh_chunks.len() as u32,
                     },
                 );
 
