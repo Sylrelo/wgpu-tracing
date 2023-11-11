@@ -100,7 +100,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [0.0, 285.0, 0.0, 0.0],
+        position: [80.0, 50.0, 190.0, 0.0],
         // position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
@@ -249,7 +249,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     .unwrap();
 
     watcher
-        .watch(Path::new("shaders/"), RecursiveMode::NonRecursive)
+        .watch(
+            Path::new("E:\\Dev\\test-ray\\shaders\\"),
+            RecursiveMode::NonRecursive,
+        )
         .expect("TODO: panic message");
 
     let app = app_arc.clone();
@@ -264,7 +267,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // let mut last_shader_update: u64 = 0;
 
-    chunks.generate_around(camera.position);
+    chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -296,10 +299,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         camera.position[0] += 1.0;
                     }
                     VirtualKeyCode::R => {
-                        camera.position[1] += 5.0;
+                        camera.position[1] += 1.0;
                     }
                     VirtualKeyCode::F => {
-                        camera.position[1] -= 5.0;
+                        camera.position[1] -= 1.0;
                     }
                     _ => (),
                 }
@@ -517,13 +520,12 @@ fn main() {
     // theorical max different chunk : 511
     // 511 | << 9 | 0x1ff
 
-
     // let test = 1048575 << 12 | 1 << 11; // node entry | ??
     // let test2 = 1048575 << 12; // node exit | ??
 
     // //         331776
     // let test3 = 524287 << 13 | 511 << 4; // voxel position relative to chunk | voxel type
-    
+
     // println!("{:b}", test);
     // println!("{:b}", test2);
     // println!("{:b}", test3);
@@ -661,9 +663,6 @@ fn main() {
     // if let Err(e) = device.get_error() {
     //     println!("Error denosing image: {}", e.1);
     // }
-
-
-
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()

@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
-    time::Instant, process::{exit, self},
+    process::{self, exit},
+    time::Instant,
 };
 
 use bvh::{
@@ -43,7 +44,6 @@ pub struct GpuBvhNode {
     pub _padding: u32,
 }
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct VoxelBvhNode {
@@ -53,48 +53,40 @@ pub struct VoxelBvhNode {
     pub aabbmax: u32,
 }
 
+// 9 + 9 + 6 + 6 = 30
+// 20 + 6 = 26
+// 20 + 6 = 26
+// 26 + 26 + 30 = 82
 
 impl VoxelBvhNode {
     pub fn new(aabb: &AABB, entry: u32, exit: u32, voxel_material: u32) -> Self {
+        let xmin = aabb.min.x as u32;
+        let ymin = aabb.min.y as u32;
+        let zmin = aabb.min.z as u32;
 
-        let x = aabb.min.x as usize;
-        let y = aabb.min.y as usize;
-        let z = aabb.min.z as usize;
+        let xmax = aabb.max.x as u32;
+        let ymax = aabb.max.y as u32;
+        let zmax = aabb.max.z as u32;
 
-        let min_index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+        let mut aabb_xxyy = xmin << 26 | xmax << 20 | ymin << 11 | ymax << 2;
+        let mut aabb_zz = zmin << 26 | zmax << 20;
 
-
-        let x = aabb.max.x as usize;
-        let y = aabb.max.y as usize;
-        let z = aabb.max.z as usize;
-
-        let max_index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
-
-
-        println!("node {} {} {}", exit, exit << 12, ((exit << 12) >> 12) & 1048575);
-        // if aabb.max.z >= 36.0 {
-        //     let posmax = [
-        //         (max_index / ((CHUNK_X) * (CHUNK_Y))),
-        //         ((max_index / (CHUNK_X)) % (CHUNK_Y)),
-        //         (max_index % (CHUNK_X))
-        //     ];
-
-        //     println!("Allo {:?} {} {:?}" , aabb.max, max_index, posmax);
-            
-        //     process::exit(9);
-        // }
-        
         let entry_shift = if entry == 4294967295 {
-            0 << 12 | 1 << 11
+            0 << 12 | 1 << 11 | voxel_material << 2
         } else {
             entry << 12 | 0 << 11
         };
 
+        if entry == 4294967295 {
+            aabb_xxyy = 0;
+            aabb_zz = 0;
+        }
+
         Self {
             entry: entry_shift,
             exit: exit << 12,
-            aabbmin_n_type: ((min_index as usize) << 13 | (voxel_material as usize) << 4) as u32,
-            aabbmax: ((max_index as usize) << 13) as u32,
+            aabbmin_n_type: aabb_xxyy,
+            aabbmax: aabb_zz,
         }
     }
 }
@@ -142,14 +134,22 @@ impl Bounded for VoxelGenerated {
         //     self.chunk_position[2] + self.position[2] as i32,
         // ];
 
-        AABB::with_bounds(
-            Point3::new(self.position[0] as f32, self.position[1] as f32, self.position[2] as f32),
+        let ab = AABB::with_bounds(
+            Point3::new(
+                self.position[0] as f32,
+                self.position[1] as f32,
+                self.position[2] as f32,
+            ),
             Point3::new(
                 self.position[0] as f32 + 1.0,
                 self.position[1] as f32 + 1.0,
                 self.position[2] as f32 + 1.0,
             ),
-        )
+        );
+
+        // println!("==> {:?}", ab);
+
+        return ab;
     }
 }
 
@@ -233,7 +233,7 @@ impl Chunk {
                 // unsafe {
 
                 let pepe =
-                    PerlinNoise2D::new(6, 10.0, 0.5, 1.0, 2.0, (100.0, 100.0), 40.0, 1346139461);
+                    PerlinNoise2D::new(6, 10.0, 0.5, 1.1, 2.0, (100.0, 100.0), 40.0, 1346139461);
 
                 let yp = pepe.get_noise(pos[0], pos[1]);
 
@@ -251,7 +251,7 @@ impl Chunk {
                 let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
                 self.chunks_mem[chunk_offset + index] = 1;
 
-                // for y in (0..y).rev() {
+                for y in (y - 2..y).rev() {
                     voxels_gen.push(VoxelGenerated {
                         chunk_position: [
                             ((position[0]) * CHUNK_X as i32),
@@ -263,7 +263,7 @@ impl Chunk {
                         voxel_type: 1,
                         node_index: 0,
                     })
-                // }
+                }
 
                 // 331776 / 995326 = 0.33333400313063255
                 // 40985 / 122953 = 0.33333875545940317
@@ -302,11 +302,17 @@ impl Chunk {
             } else {
                 0
             };
-
+            // println!("=> {} {}", entry, exit);
             VoxelBvhNode::new(aabb, entry, exit, offset)
         };
         let bvh_voxel_flatten = bvh_voxel.flatten_custom(&custom_constructor);
 
+        // bvh_voxel.pretty_print();
+        // for v in bvh_voxel_flatten {
+        //     println!("{:8} {:8}", v.entry, v.exit);
+        // }
+
+        // exit(0);
         println!(
             "Offset: {} | Vox count : {} / {} - {} ms",
             chunk_offset,
@@ -384,50 +390,54 @@ impl Chunk {
 
         self.bvh_chunks = bvh_chunk.flatten_custom(&custom_constructor);
 
+        // for (index, node) in self.bvh_chunk_voxels.iter().enumerate() {
+        //     if index > 16 {
+        //         break;
+        //     }
+        //     // if node.exit == 0 {
+        //     //     continue;
+        //     // }
 
-        for (index, node) in self.bvh_chunk_voxels.iter().enumerate() {
-            if index > 10 {
-                break;
-            }
-            // if node.entry == 0 {
-            //     continue;
-            // }
+        //     let position_index_min = node.aabbmin_n_type >> 13 & 524287;
+        //     let position_index_max = node.aabbmax >> 13 & 524287;
 
-            let position_index_min = node.aabbmin_n_type >> 13 & 524287;
-            let position_index_max = node.aabbmax >> 13 & 524287;
+        //     let posmax = [
+        //         (position_index_max % (CHUNK_X as u32)),
+        //         ((position_index_max / (CHUNK_X as u32)) % (CHUNK_Y as u32)),
+        //         (position_index_max / ((CHUNK_X as u32) * (CHUNK_Y as u32))),
+        //     ];
+        //     let posmin = [
+        //         (position_index_min % (CHUNK_X as u32)),
+        //         ((position_index_min / (CHUNK_X as u32)) % (CHUNK_Y as u32)),
+        //         (position_index_min / ((CHUNK_X as u32) * (CHUNK_Y as u32))),
+        //     ];
 
-            let posmax = [
-                (position_index_max % (CHUNK_X as u32)),
-                ((position_index_max / (CHUNK_X as u32)) % (CHUNK_Y as u32)),
-                (position_index_max / ((CHUNK_X as u32) * (CHUNK_Y as u32))),
-            ];
-            let posmin = [
-                (position_index_min % (CHUNK_X as u32)),
-                ((position_index_min / (CHUNK_X as u32)) % (CHUNK_Y as u32)),
-                (position_index_min / ((CHUNK_X as u32) * (CHUNK_Y as u32))),
-            ];
+        //     println!(
+        //         "{:5} - ({:11}) ({:11}) - {:1} {:8} {:8}  : {:?} {:?}",
+        //         index,
+        //         node.entry,
+        //         node.exit,
+        //         (node.entry >> 11) & 1,
+        //         (node.entry >> 12) & 1048575,
+        //         (node.exit >> 12) & 1048575,
+        //         posmin,
+        //         posmax,
+        //     );
+        // }
 
-            println!(
-                "{:5} - {:1} {:11} {:11}  : {:?} {:?}",
-                index, 
-                (node.entry >> 11) & 1, 
-                (node.entry >> 12) & 1048575, 
-                (node.exit >> 12) & 1048575, 
-                posmin,
-                posmax,
-            );
-        }
-
-        for (index, node) in self.bvh_chunks.iter().enumerate() {
-            println!(
-                "{:5} - {:11} {:11} | {:11} | {:?} {:?}",
-                index, node.entry, node.exit, node.offset, node.min, node.max
-            );
-        }
+        // for (index, node) in self.bvh_chunks.iter().enumerate() {
+        //     println!(
+        //         "{:5} - {:11} {:11} | {:11} | {:?} {:?}",
+        //         index, node.entry, node.exit, node.offset, node.min, node.max
+        //     );
+        // }
         println!("{}", self.generated_chunks.len());
         println!("{}", self.bvh_chunks.len());
         println!("{}", self.bvh_chunk_voxels.len());
-        println!("{}", self.bvh_chunk_voxels.len() * std::mem::size_of::<GpuBvhNode>());
+        println!(
+            "{}",
+            self.bvh_chunk_voxels.len() * std::mem::size_of::<GpuBvhNode>()
+        );
         println!("{}", self.bvh_chunk_voxels.len() * 16);
 
         // println!(

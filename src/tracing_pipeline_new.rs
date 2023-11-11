@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::{
-    chunk_generator::{GpuBvhNode, CHUNK_TSIZE, VoxelBvhNode},
+    chunk_generator::{GpuBvhNode, VoxelBvhNode, CHUNK_TSIZE},
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
@@ -115,6 +115,7 @@ impl TracingPipelineTest {
     }
 
     pub fn buffer_bvh_chunk_voxels_update(&self, queue: &Queue, nodes: &Vec<VoxelBvhNode>) {
+        println!("Uploading {}", nodes.len());
         queue.write_buffer(
             &self.buffers.bvh_chunk_voxels,
             0,

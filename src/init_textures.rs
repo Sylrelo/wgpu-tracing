@@ -15,7 +15,6 @@ pub struct RenderTexture {
 
     pub normal: Texture,
     pub normal_view: TextureView,
-
     // pub depth: Texture,
     // pub depth_view: TextureView,
 }
@@ -33,9 +32,9 @@ impl RenderTexture {
 
         let normal =
             Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Snorm);
-        let normal_view = normal.create_view(&TextureViewDescriptor{
-          format: Some(TextureFormat::Rgba8Snorm),
-          ..TextureViewDescriptor::default()
+        let normal_view = normal.create_view(&TextureViewDescriptor {
+            format: Some(TextureFormat::Rgba8Snorm),
+            ..TextureViewDescriptor::default()
         });
 
         // let depth =
@@ -55,7 +54,6 @@ impl RenderTexture {
 
             normal,
             normal_view,
-
             // depth,
             // depth_view,
         }
@@ -66,9 +64,9 @@ impl RenderTexture {
             address_mode_u: AddressMode::ClampToEdge,
             address_mode_v: AddressMode::ClampToEdge,
             address_mode_w: AddressMode::ClampToEdge,
-            mag_filter: FilterMode::Nearest,
-            min_filter: FilterMode::Nearest,
-            mipmap_filter: FilterMode::Nearest,
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            mipmap_filter: FilterMode::Linear,
             ..Default::default()
         })
     }
