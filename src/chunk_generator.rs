@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    process::exit,
-    time::Instant,
+    time::Instant, process::{exit, self},
 };
 
 use bvh::{
@@ -50,23 +49,55 @@ pub struct GpuBvhNode {
 pub struct VoxelBvhNode {
     pub entry: u32,
     pub exit: u32,
-    pub position_n_type: u32,
-    pub _padding: u32,
+    pub aabbmin_n_type: u32,
+    pub aabbmax: u32,
 }
 
 
-// impl VoxelBvhNode {
-//     pub fn new(aabb: &AABB, entry: u32, exit: u32, offset: u32) -> Self {
-//         Self {
-//             min: [aabb.min.x, aabb.min.y, aabb.min.z, 0.0],
-//             max: [aabb.max.x, aabb.max.y, aabb.max.z, 0.0],
-//             entry,
-//             exit,
-//             offset,
-//             _padding: 0,
-//         }
-//     }
-// }
+impl VoxelBvhNode {
+    pub fn new(aabb: &AABB, entry: u32, exit: u32, voxel_material: u32) -> Self {
+
+        let x = aabb.min.x as usize;
+        let y = aabb.min.y as usize;
+        let z = aabb.min.z as usize;
+
+        let min_index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+
+
+        let x = aabb.max.x as usize;
+        let y = aabb.max.y as usize;
+        let z = aabb.max.z as usize;
+
+        let max_index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+
+
+        println!("node {} {} {}", exit, exit << 12, ((exit << 12) >> 12) & 1048575);
+        // if aabb.max.z >= 36.0 {
+        //     let posmax = [
+        //         (max_index / ((CHUNK_X) * (CHUNK_Y))),
+        //         ((max_index / (CHUNK_X)) % (CHUNK_Y)),
+        //         (max_index % (CHUNK_X))
+        //     ];
+
+        //     println!("Allo {:?} {} {:?}" , aabb.max, max_index, posmax);
+            
+        //     process::exit(9);
+        // }
+        
+        let entry_shift = if entry == 4294967295 {
+            0 << 12 | 1 << 11
+        } else {
+            entry << 12 | 0 << 11
+        };
+
+        Self {
+            entry: entry_shift,
+            exit: exit << 12,
+            aabbmin_n_type: ((min_index as usize) << 13 | (voxel_material as usize) << 4) as u32,
+            aabbmax: ((max_index as usize) << 13) as u32,
+        }
+    }
+}
 
 impl GpuBvhNode {
     pub fn new(aabb: &AABB, entry: u32, exit: u32, offset: u32) -> Self {
@@ -105,11 +136,11 @@ impl BHShape for ChunkGenerated {
 
 impl Bounded for VoxelGenerated {
     fn aabb(&self) -> AABB {
-        let position = [
-            self.chunk_position[0] + self.position[0] as i32,
-            self.chunk_position[1] + self.position[1] as i32,
-            self.chunk_position[2] + self.position[2] as i32,
-        ];
+        // let position = [
+        //     self.chunk_position[0] + self.position[0] as i32,
+        //     self.chunk_position[1] + self.position[1] as i32,
+        //     self.chunk_position[2] + self.position[2] as i32,
+        // ];
 
         AABB::with_bounds(
             Point3::new(self.position[0] as f32, self.position[1] as f32, self.position[2] as f32),
@@ -146,8 +177,8 @@ pub struct Chunk {
     // generated_chunks_voxs: HashMap<[i32; 3], Vec<u32>>,
     bvh_generated_chunks: Vec<ChunkGenerated>,
     pub bvh_chunks: Vec<GpuBvhNode>,
-    pub bvh_chunk_voxels: Vec<GpuBvhNode>,
-    pub bvh_chunk_voxels_bitwise: Vec<VoxelBvhNode>,
+    pub bvh_chunk_voxels: Vec<VoxelBvhNode>,
+    // pub bvh_chunk_voxels_bitwise: Vec<VoxelBvhNode>,
 }
 
 #[allow(dead_code, unused_variables)]
@@ -174,7 +205,7 @@ impl Chunk {
             bvh_generated_chunks: Vec::new(),
             bvh_chunks: Vec::new(),
             bvh_chunk_voxels: Vec::new(),
-            bvh_chunk_voxels_bitwise: Vec::new()
+            // bvh_chunk_voxels_bitwise: Vec::new()
         }
     }
 
@@ -220,7 +251,7 @@ impl Chunk {
                 let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
                 self.chunks_mem[chunk_offset + index] = 1;
 
-                for y in (0..y).rev() {
+                // for y in (0..y).rev() {
                     voxels_gen.push(VoxelGenerated {
                         chunk_position: [
                             ((position[0]) * CHUNK_X as i32),
@@ -232,7 +263,7 @@ impl Chunk {
                         voxel_type: 1,
                         node_index: 0,
                     })
-                }
+                // }
 
                 // 331776 / 995326 = 0.33333400313063255
                 // 40985 / 122953 = 0.33333875545940317
@@ -272,7 +303,7 @@ impl Chunk {
                 0
             };
 
-            GpuBvhNode::new(aabb, entry, exit, offset)
+            VoxelBvhNode::new(aabb, entry, exit, offset)
         };
         let bvh_voxel_flatten = bvh_voxel.flatten_custom(&custom_constructor);
 
@@ -354,15 +385,38 @@ impl Chunk {
         self.bvh_chunks = bvh_chunk.flatten_custom(&custom_constructor);
 
 
-        // for (index, node) in self.bvh_chunk_voxels.iter().enumerate() {
-        //     if node.entry == 0 {
-        //         continue;
-        //     }
-        //     println!(
-        //         "{:5} - {:11} {:11} | {:11} | {:?} {:?}",
-        //         index, node.entry, node.exit, node.offset, node.min, node.max
-        //     );
-        // }
+        for (index, node) in self.bvh_chunk_voxels.iter().enumerate() {
+            if index > 10 {
+                break;
+            }
+            // if node.entry == 0 {
+            //     continue;
+            // }
+
+            let position_index_min = node.aabbmin_n_type >> 13 & 524287;
+            let position_index_max = node.aabbmax >> 13 & 524287;
+
+            let posmax = [
+                (position_index_max % (CHUNK_X as u32)),
+                ((position_index_max / (CHUNK_X as u32)) % (CHUNK_Y as u32)),
+                (position_index_max / ((CHUNK_X as u32) * (CHUNK_Y as u32))),
+            ];
+            let posmin = [
+                (position_index_min % (CHUNK_X as u32)),
+                ((position_index_min / (CHUNK_X as u32)) % (CHUNK_Y as u32)),
+                (position_index_min / ((CHUNK_X as u32) * (CHUNK_Y as u32))),
+            ];
+
+            println!(
+                "{:5} - {:1} {:11} {:11}  : {:?} {:?}",
+                index, 
+                (node.entry >> 11) & 1, 
+                (node.entry >> 12) & 1048575, 
+                (node.exit >> 12) & 1048575, 
+                posmin,
+                posmax,
+            );
+        }
 
         for (index, node) in self.bvh_chunks.iter().enumerate() {
             println!(
@@ -454,14 +508,20 @@ impl Chunk {
             let chunk_offset = self.bvh_chunk_voxels.len();
             self.bvh_chunk_voxels.resize(
                 chunk_offset + CHUNK_MEM_OFFSET,
-                GpuBvhNode {
-                    min: [0.0, 0.0, 0.0, 0.0],
-                    max: [0.0, 0.0, 0.0, 0.0],
+                VoxelBvhNode {
                     entry: 0,
                     exit: 0,
-                    offset: 0,
-                    _padding: 0,
+                    aabbmin_n_type: 0,
+                    aabbmax: 0,
                 },
+                // GpuBvhNode {
+                //     min: [0.0, 0.0, 0.0, 0.0],
+                //     max: [0.0, 0.0, 0.0, 0.0],
+                //     entry: 0,
+                //     exit: 0,
+                //     offset: 0,
+                //     _padding: 0,
+                // },
             );
 
             // println!(

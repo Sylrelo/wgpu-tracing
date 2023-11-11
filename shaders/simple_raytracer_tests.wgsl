@@ -34,6 +34,13 @@ struct GpuBvhNode {
     _padding: u32,
 }
 
+struct VoxelBvhNode {
+    entry: u32,
+    exit: u32,
+    aabbmin_n_type: u32,
+    aabbmax: u32,
+}
+
 
 // DATA ======================================================
 
@@ -47,7 +54,7 @@ var<storage> chunk_content: array<u32>;
 var<storage> bvh_root_chunks: array<GpuBvhNode>;
 
 @group(1) @binding(2)
-var<storage> bvh_voxels_chunk: array<GpuBvhNode>;
+var<storage> bvh_voxels_chunk: array<VoxelBvhNode>;
 
 // @group(1) @binding(1)
 // var<storage> root_chunks: array<vec4<i32>>;
@@ -358,15 +365,22 @@ fn traverse_voxels(ray_in: Ray, chunk_position: vec3<f32>, offset: u32) -> f32 {
     var prev_t = F32_MAX;
     var t_dist = F32_MAX;
 
+    // var iter = 0;
     while node_idx < (offset + MEM_SIZE) && node_idx < arrayLength(&bvh_voxels_chunk) { // offset + max_size
         let node = bvh_voxels_chunk[node_idx];
 
+
+        // iter++;
+            // t_dist = f32(node_idx - offset);
+
+        // t_dist = f32(iter);
         if node.entry == 0u {
+            // t_dist = 10.0;
             break;
         }
 
-        if node.entry == 4294967295u {
-            node_idx = offset + node.exit;
+        if ((node.entry >> 11u) & 1u) == 1u {
+            node_idx = offset + ((node.exit >> 12u) & 1048575u);
 
             if prev_t < t_dist {
                 t_dist = prev_t;
@@ -374,17 +388,32 @@ fn traverse_voxels(ray_in: Ray, chunk_position: vec3<f32>, offset: u32) -> f32 {
             continue;
         }
 
+        let position_index_min = (node.aabbmin_n_type >> 13u) & 524287u;
+        let position_index_max = (node.aabbmax >> 13u) & 524287u;
+
+        let posmin = vec3(
+            f32(position_index_min % u32(CHUNK_XMAX)),
+            f32((position_index_min / u32(CHUNK_XMAX)) % u32(CHUNK_YMAX)),
+            f32(position_index_min / (u32(CHUNK_XMAX) * u32(CHUNK_YMAX))),
+        );
+        let posmax = vec3(
+            f32(position_index_max % u32(CHUNK_XMAX)),
+            f32((position_index_max / u32(CHUNK_XMAX)) % u32(CHUNK_YMAX)),
+            f32(position_index_max / (u32(CHUNK_XMAX) * u32(CHUNK_YMAX))),
+        );
+
         let t = intersect_aabb(
             ray_in,
-            chunk_position + node.min.xyz,
-            chunk_position + node.max.xyz,
+            chunk_position + posmin,
+            chunk_position + posmax,
         );
 
         if t > 0.0 {
-            node_idx = offset + node.entry;
+            node_idx = offset + ((node.entry >> 12u) & 1048575u);
             prev_t = t;
+            // t_dist = t;
         } else {
-            node_idx = offset + node.exit;
+            node_idx = offset + ((node.exit >> 12u) & 1048575u);
         }
     }
 
@@ -392,14 +421,25 @@ fn traverse_voxels(ray_in: Ray, chunk_position: vec3<f32>, offset: u32) -> f32 {
 }
 
 fn raytrace(ray_in: Ray) -> vec3<f32> {
+    // let diud = traverse_voxels(ray_in, vec3(0.0), 0u);
+
+    // if diud > 0.0 && diud != F32_MAX {
+    //     return vec3(0.2, 0.2, diud / 500.0);
+    // }
+
     var node_idx = 0u;
     var prev_t = F32_MAX;
     var prev_node: GpuBvhNode;
 
     var vox_dist_t = F32_MAX;
+    var iter = 0.0;
 
     while node_idx < settings.root_chunk_count {
         let node = bvh_root_chunks[node_idx];
+
+        iter+=1.0;
+
+
 
         if node.entry == 4294967295u {
             node_idx = node.exit;
@@ -433,7 +473,8 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     }
 
     if prev_t != F32_MAX {
-        return vec3(prev_t / 1500.0, 0.0, 0.0);
+        return vec3(iter / 1500.0, 0.0, 0.0);
+        // return vec3(prev_t / 1500.0, 0.0, 0.0);
     }
 
     return vec3(

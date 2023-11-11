@@ -518,7 +518,7 @@ fn main() {
     // 511 | << 9 | 0x1ff
 
 
-    // let test = 1048575 << 12; // node entry | ??
+    // let test = 1048575 << 12 | 1 << 11; // node entry | ??
     // let test2 = 1048575 << 12; // node exit | ??
 
     // //         331776
