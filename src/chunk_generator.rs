@@ -222,6 +222,32 @@ impl Chunk {
 
         let mut voxels_gen: Vec<VoxelGenerated> = Vec::new();
 
+        voxels_gen.push(VoxelGenerated {
+            chunk_position: [
+                ((position[0]) * CHUNK_X as i32),
+                0,
+                ((position[2]) * CHUNK_Z as i32),
+            ],
+            // position: [pos[0] as u32, y as u32, pos[1] as u32],
+            position: [18, 40, 18],
+            voxel_type: 2,
+            node_index: 0,
+        });
+
+        for x in 0..CHUNK_X {
+            for z in 0..CHUNK_Z {
+                voxels_gen.push(VoxelGenerated {
+                    chunk_position: [
+                        ((position[0]) * CHUNK_X as i32),
+                        0,
+                        ((position[2]) * CHUNK_Z as i32),
+                    ],
+                    position: [x as u32, 24, z as u32],
+                    voxel_type: 3,
+                    node_index: 0,
+                });
+            }
+        }
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
                 let pos = [
@@ -252,6 +278,9 @@ impl Chunk {
                 self.chunks_mem[chunk_offset + index] = 1;
 
                 for y in (y - 2..y).rev() {
+                    if y == 26 {
+                        continue;
+                    }
                     voxels_gen.push(VoxelGenerated {
                         chunk_position: [
                             ((position[0]) * CHUNK_X as i32),

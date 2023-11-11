@@ -1,14 +1,12 @@
 use std::borrow::Cow;
 
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 
 use std::path::Path;
 
-use std::process::exit;
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::sleep;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
 use bvh::aabb::Bounded;
@@ -35,7 +33,6 @@ use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
 use crate::init_wgpu::InitWgpu;
 use crate::structs::{Camera, RenderContext, INTERNAL_H, INTERNAL_W};
-use crate::tracing_pipeline::TracingPipeline;
 use crate::tracing_pipeline_new::TracingPipelineSettings;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
@@ -274,7 +271,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         let mut app = app.lock().unwrap();
         // let tracing_pipeline = tracing_pipeline.lock().unwrap();
-        let _denoiser_pipeline = denoiser_pipeline.lock().unwrap();
+        let denoiser_pipeline = denoiser_pipeline.lock().unwrap();
         let tracing_pipeline_new = tracing_pipeline_new.lock().unwrap();
         match event {
             Event::WindowEvent {
@@ -442,7 +439,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 // tracing_pipeline.compute_pass(&mut encoder);
                 tracing_pipeline_new.exec_pass(&mut encoder);
-
                 // denoiser_pipeline.exec_pass(&mut encoder);
 
                 {

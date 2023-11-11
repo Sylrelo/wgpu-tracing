@@ -186,6 +186,20 @@ impl TracingPipelineTest {
             )
             .visibility(ShaderStages::COMPUTE)
             .done()
+            .with_storage_texture(
+                &textures.normal_view,
+                TextureFormat::Rgba8Snorm,
+                StorageTextureAccess::WriteOnly,
+            )
+            .visibility(ShaderStages::COMPUTE)
+            .done()
+            .with_storage_texture(
+                &textures.color_view,
+                TextureFormat::Rgba8Unorm,
+                StorageTextureAccess::WriteOnly,
+            )
+            .visibility(ShaderStages::COMPUTE)
+            .done()
             .build()
     }
 
