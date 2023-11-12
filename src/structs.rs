@@ -4,8 +4,8 @@ use winit::window::Window;
 
 // pub const INTERNAL_W: u32 = (1920.0f32 / 1.0) as u32;
 // pub const INTERNAL_H: u32 = (1080.0f32 / 1.0) as u32;
-pub const INTERNAL_W: u32 = (1280 / 2) as u32;
-pub const INTERNAL_H: u32 = (720 / 2) as u32;
+pub const INTERNAL_W: u32 = (1280) as u32;
+pub const INTERNAL_H: u32 = (720) as u32;
 
 pub struct SwapchainData {
     pub capabilities: SurfaceCapabilities,

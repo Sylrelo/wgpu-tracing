@@ -210,6 +210,9 @@ fn intersect_aabb(ray: Ray, min: vec3<f32>, max: vec3<f32>) -> f32 {
     return 0.0;
 }
 
+fn aabb_intersect(ray_in: Ray, min: vec3<f32>, max: vec3<f32>) {
+}
+
 fn normal_cube(
     ray_position: vec3<f32>,
     pos: vec3<f32>,
@@ -218,37 +221,95 @@ fn normal_cube(
 ) -> vec3<f32> {
     let epsilon = 0.00001;
 
+
+    // return vec3(0.0);
+    // let box_center = (max - min) * 0.5 + min;
+    // let popos = (ray_position) - box_center;
+    // let aled = popos / max(max(abs(popos.x), abs(popos.y)), abs(popos.z));
+    // let box_normal = clamp(aled, vec3(0.0), vec3(1.0));
+    // let norm = normalize(floor(box_normal * 1.000001));
+
+    // return norm;
     // let c = (min + max) * 0.5;
     // let p = ray_position - c;
     // let d = (min - max) * 0.5;
 
     // return normalize(vec3<f32>(floor(p / abs(d) * epsilon)));
 
-    let bmin = min - pos;
-    let bmax = max - pos;
 
-    let cx = abs(ray_position.x - bmin.x);
-    let fx = abs(ray_position.x - bmax.x);
-    let cy = abs(ray_position.y - bmin.y);
-    let fy = abs(ray_position.y - bmax.y);
-    let cz = abs(ray_position.z - bmin.z);
-    let fz = abs(ray_position.z - bmax.z);
+    let center = 0.5 * (min + max);
+    let pc = ray_position - center;
+    let size = 0.5 * (max - min);
 
-    if cx < epsilon {
-        return vec3(-1.0, 0.0, 0.0);
-    } else if fx < epsilon {
-        return vec3(1.0, 0.0, 0.0);
-    } else if cy < epsilon {
-        return vec3(0.0, -1.0, 0.0);
-    } else if fy < epsilon {
-        return vec3(0.0, 1.0, 0.0);
-    } else if cz < epsilon {
-        return vec3(0.0, 0.0, -1.0);
-    } else if fz < epsilon {
-        return vec3(0.0, 0.0, 1.0);
+    // return normalize(sign(centerToPoint) * step(vec3(-epsilon), abs(centerToPoint) - halfSize));
+
+    // var normal = vec3(0.0);
+    // normal += vec3(sign(pc.x), 0.0, 0.0) * step(abs(abs(pc.x) - size.x), epsilon);
+    // normal += vec3(0.0, sign(pc.y), 0.0) * step(abs(abs(pc.y) - size.y), epsilon);
+    // normal += vec3(0.0, 0.0, sign(pc.z)) * step(abs(abs(pc.z) - size.z), epsilon);
+
+    // return normalize(normal);
+
+    let d = ray_position - (min + 0.5);
+    let dabs = abs(d);
+    if dabs.x > dabs.y {
+        if dabs.x > dabs.z {
+            return vec3(sign(d.x), 0.0, 0.0);
+        } else {
+            return vec3(0.0, 0.0, sign(d.z));
+        }
+    } else {
+        if dabs.y > dabs.z {
+            return vec3(0.0, sign(d.y), 0.0);
+        } else {
+            return vec3(0.0, 0.0, sign(d.z));
+        }
     }
 
-    return vec3(0.0, 0.0, 0.0);
+
+    // let bmin = min;
+    // let bmax = max;
+
+    // let cx = abs(ray_position.x - bmin.x);
+    // let fx = abs(ray_position.x - bmax.x);
+
+    // let cy = abs(ray_position.y - bmin.y);
+    // let fy = abs(ray_position.y - bmax.y);
+
+    // let cz = abs(ray_position.z - bmin.z);
+    // let fz = abs(ray_position.z - bmax.z);
+
+
+
+    // if ray_position.x < bmin.x + epsilon {
+    //     return vec3(-1.0, 0.0, 0.0);
+    // } else if ray_position.x > bmax.x - epsilon {
+    //     return vec3(1.0, 0.0, 0.0);
+    // } else if ray_position.y < bmin.y + epsilon {
+    //     return vec3(0.0, -1.0, 0.0);
+    // } else if ray_position.y > bmax.y - epsilon {
+    //     return vec3(0.0, 1.0, 0.0);
+    // } else if ray_position.z < bmin.z + epsilon {
+    //     return vec3(0.0, 0.0, -1.0);
+    // } else if ray_position.z > bmax.z - epsilon {
+    //     return vec3(0.0, 0.0, 1.0);
+    // }
+
+    //  if cx <= epsilon {
+    //     return vec3(-1.0, 0.0, 0.0);
+    // } else if fx <= epsilon {
+    //     return vec3(1.0, 0.0, 0.0);
+    // } else if cy <= epsilon {
+    //     return vec3(0.0, -1.0, 0.0);
+    // } else if fy <= epsilon {
+    //     return vec3(0.0, 1.0, 0.0);
+    // } else if cz <= epsilon {
+    //     return vec3(0.0, 0.0, -1.0);
+    // } else if fz <= epsilon {
+    //     return vec3(0.0, 0.0, 1.0);
+    // }
+
+    // return vec3(0.0, 0.0, 0.0);
 }
 
 // RAYTRACING =================================================
@@ -322,6 +383,219 @@ fn traverse_voxels(ray_in: Ray, chunk_position: vec3<f32>, offset: u32) -> BvhVo
     return hit;
 }
 
+
+// TEST AGAIN
+struct DataDda {
+    map: vec3<i32>,
+    max: vec3<f32>,
+    step_amount: vec3<i32>,
+    delta: vec3<f32>,
+    side: i32,
+    hit_data: u32,
+    t: f32,
+}
+
+
+fn dda_prepare_scratch(
+    ray_in: Ray,
+    grid_min: vec3<f32>,
+    grid_max: vec3<f32>,
+    aabb_tmin: f32,
+) -> DataDda {
+    var dda: DataDda;
+    let resolution = vec3(36, 256, 36);
+    let cell_dimensions = vec3(1.0, 1.0, 1.0);
+
+    let ray_orig_cell = (ray_in.orig + ray_in.dir * aabb_tmin) - grid_min;
+    dda.map = clamp(vec3<i32>(floor(ray_orig_cell / cell_dimensions)), vec3(0), resolution);
+
+
+    if ray_in.dir.x < 0.0 {
+        dda.step_amount.x = -1;
+        dda.delta.x = -cell_dimensions.x * ray_in.inv_dir.x;
+        dda.max.x = aabb_tmin + (f32(dda.map.x) * cell_dimensions.x - ray_orig_cell.x) * ray_in.inv_dir.x;
+    } else if ray_in.dir.x > 0.0 {
+        dda.step_amount.x = 1;
+        dda.delta.x = cell_dimensions.x * ray_in.inv_dir.x;
+        dda.max.x = aabb_tmin + (f32(dda.map.x + 1) * cell_dimensions.x - ray_orig_cell.x) * ray_in.inv_dir.x;
+    }
+
+    if ray_in.dir.y < 0.0 {
+        dda.step_amount.y = -1;
+        dda.delta.y = -cell_dimensions.y * ray_in.inv_dir.y;
+        dda.max.y = aabb_tmin + (f32(dda.map.y) * cell_dimensions.y - ray_orig_cell.y) * ray_in.inv_dir.y;
+    } else if ray_in.dir.y > 0.0 {
+        dda.step_amount.y = 1;
+        dda.delta.y = cell_dimensions.y * ray_in.inv_dir.y;
+        dda.max.y = aabb_tmin + (f32(dda.map.y + 1) * cell_dimensions.y - ray_orig_cell.y) * ray_in.inv_dir.y;
+    }
+
+    if ray_in.dir.z < 0.0 {
+        dda.step_amount.z = -1;
+        dda.delta.z = -cell_dimensions.z * ray_in.inv_dir.z;
+        dda.max.z = aabb_tmin + (f32(dda.map.z) * cell_dimensions.z - ray_orig_cell.z) * ray_in.inv_dir.z;
+    } else if ray_in.dir.z > 0.0 {
+        dda.step_amount.z = 1;
+        dda.delta.z = cell_dimensions.z * ray_in.inv_dir.z;
+        dda.max.z = aabb_tmin + (f32(dda.map.z + 1) * cell_dimensions.z - ray_orig_cell.z) * ray_in.inv_dir.z;
+    }
+
+    // for (var i = 0; i < 3; i++) {
+    //     let ray_orig_cell = (ray_in.orig[i] + ray_in.dir[i] * aabb_tmin) - grid_min[i];
+    //     dda.map[i] = clamp(i32(floor(ray_orig_cell / cell_dimensions[i])), 0, resolution[i]);
+
+    //     if ray_in.dir[i] < 0.0 {
+    //         dda.step_amount[i] = -1;
+    //         dda.delta[i] = -cell_dimensions[i] * ray_in.inv_dir[i];
+    //         dda.max[i] = aabb_tmin + (f32(dda.map[i]) * cell_dimensions[i] - ray_orig_cell) * ray_in.inv_dir[i];
+    //     } else {
+    //         dda.step_amount[i] = 1;
+    //         dda.delta[i] = cell_dimensions[i] * ray_in.inv_dir[i];
+    //         dda.max[i] = aabb_tmin + (f32(dda.map[i] + 1) * cell_dimensions[i] - ray_orig_cell) * ray_in.inv_dir[i];
+    //     }
+    // }
+
+    return dda;
+}
+
+
+
+
+fn dda_prepare(ray: Ray, cell_size: vec3<f32>, min_bound: vec3<f32>) -> DataDda {
+    var dda: DataDda;
+
+    dda.map = vec3<i32>((ray.orig - min_bound) / cell_size);
+    dda.delta = vec3(abs(ray.inv_dir) * cell_size);
+    dda.step_amount = vec3(0);
+    dda.max = vec3(0.0);
+
+    if ray.dir.x < 0.0 {
+        dda.step_amount.x = -1;
+        dda.max.x = (min_bound.x + (f32(dda.map.x) * cell_size.x) - ray.orig.x) * ray.inv_dir.x ;
+    } else if ray.dir.x > 0.0 {
+        dda.step_amount.x = 1;
+        dda.max.x = (min_bound.x + (f32(dda.map.x + 1) * cell_size.x) - ray.orig.x) * ray.inv_dir.x;
+    }
+
+    if ray.dir.y < 0.0 {
+        dda.step_amount.y = -1;
+        dda.max.y = (min_bound.y + (f32(dda.map.y) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
+    } else if ray.dir.y > 0.0 {
+        dda.step_amount.y = 1;
+        dda.max.y = (min_bound.y + (f32(dda.map.y + 1) * cell_size.y) - ray.orig.y) * ray.inv_dir.y;
+    }
+
+    if ray.dir.z < 0.0 {
+        dda.step_amount.z = -1;
+        dda.max.z = (min_bound.z + (f32(dda.map.z) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
+    } else if ray.dir.z > 0.0 {
+        dda.step_amount.z = 1;
+        dda.max.z = (min_bound.z + (f32(dda.map.z + 1) * cell_size.z) - ray.orig.z) * ray.inv_dir.z;
+    }
+
+    return dda;
+}
+
+fn dda_steps(ray: Ray, dda: ptr<function, DataDda>) {
+    if (*dda).max.x < (*dda).max.y && (*dda).max.x < (*dda).max.z {
+        (*dda).map.x += (*dda).step_amount.x;
+        (*dda).max.x += (*dda).delta.x;
+        (*dda).side = 0;
+        (*dda).t = (f32((*dda).map.x) - ray.orig.x + f32(1 - (*dda).step_amount.x) * 0.5) * ray.inv_dir.x;
+    } else if (*dda).max.y < (*dda).max.z {
+        (*dda).map.y += (*dda).step_amount.y;
+        (*dda).max.y += (*dda).delta.y;
+        (*dda).side = 2;
+        (*dda).t = (f32((*dda).map.y) - ray.orig.y + f32(1 - (*dda).step_amount.y) * 0.5) * ray.inv_dir.y;
+    } else {
+        (*dda).map.z += (*dda).step_amount.z;
+        (*dda).max.z += (*dda).delta.z;
+        (*dda).side = 1;
+        (*dda).t = (f32((*dda).map.z) - ray.orig.z + f32(1 - (*dda).step_amount.z) * 0.5) * ray.inv_dir.z;
+    }
+}
+
+
+fn get_normal(side: i32, delta: vec3<i32>) -> vec3<f32> {
+
+    if side == 0 && delta.x > 0 {
+        return vec3(-1.0, 0.0, 0.0);
+    } else if side == 0 && delta.x < 0 {
+        return vec3(1.0, 0.0, 0.0);
+    }
+
+    if side == 1 && delta.z < 0 {
+        return vec3(0.0, 0.0, 1.0);
+    } else if side == 1 && delta.z > 0 {
+        return vec3(0.0, 0.0, -1.0);
+    }
+
+    if delta.y > 0 {
+        return vec3(0.0, -1.0, 0.0);
+    } else {
+        return vec3(0.0, 1.0, 0.0);
+    }
+}
+
+    // ray_in: Ray,
+    // grid_min: vec3<f32>,
+    // grid_max: vec3<f32>,
+    // grid_resolution: vec3<f32>,
+    // aabb_tmin: f32,
+
+fn traver_voxel_ug(
+    ray_in: Ray,
+    chunk_offset: u32,
+    min_bound: vec3<f32>,
+    max_bound: vec3<f32>,
+    dist: f32,
+) -> DataDda {
+
+    var dda: DataDda = dda_prepare_scratch(
+        ray_in,
+        min_bound,
+        max_bound,
+        dist
+    );
+    // var dda: DataDda = dda_prepare(ray_in, vec3(1.0), min_bound);
+    var iter = 0u;
+
+    let len = settings.chunk_content_count;
+
+    if chunk_offset >= len || len <= 0u {
+        return dda;
+    }
+
+    while iter < 120u && dda.hit_data == 0u {
+        iter++;
+        dda_steps(ray_in, &dda);
+
+        let index = i32(chunk_offset) + ((dda.map.z * CHUNK_XMAX * CHUNK_YMAX) + (dda.map.y * CHUNK_XMAX) + dda.map.x);
+
+        if dda.map.x < 0 || dda.map.x >= CHUNK_XMAX || dda.map.y < 0 || dda.map.y >= CHUNK_YMAX || dda.map.z < 0 || dda.map.z >= CHUNK_ZMAX || index >= i32(len) || index < 0 {
+            continue;
+        }
+
+        dda.hit_data = chunk_content[index];
+    }
+
+    let hit_t = intersect_aabb(
+        ray_in,
+        min_bound + vec3(f32(dda.map.x), f32(dda.map.y), f32(dda.map.z)),
+        max_bound + vec3(f32(dda.map.x) + 1.0, f32(dda.map.y) + 1.0, f32(dda.map.z) + 1.0),
+    );
+
+    if dda.hit_data != 0u && hit_t > 0.0 {
+        dda.t = hit_t;
+        // dda.t = f32(iter) ;
+    //     return dda.t;
+    }
+
+    return dda;
+}
+
+// 
+
 fn bvh_traverse_chunks(ray_in: Ray) -> BvhVoxelHit {
     var hit: BvhVoxelHit = BvhVoxelHit(0u, F32_MAX, vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
 
@@ -329,25 +603,55 @@ fn bvh_traverse_chunks(ray_in: Ray) -> BvhVoxelHit {
     var prev_t = F32_MAX;
     var prev_node: GpuBvhNode;
 
-    // var iter = 0;
+    var last_t = F32_MAX;
 
     while node_idx < settings.root_chunk_count {
         let node = bvh_root_chunks[node_idx];
 
-        // iter += 1;
-
         if node.entry == 4294967295u {
             node_idx = node.exit;
 
-            let tmp_hit = traverse_voxels(ray_in, prev_node.min.xyz, node.offset);
 
-            if tmp_hit.dist < hit.dist {
-                hit = tmp_hit;
+            if prev_t < last_t {
+                last_t = prev_t;
             }
 
-            // if prev_t < hit.dist {
-            //     hit.dist = prev_t;
-            //     // hit.dist = f32(iter);
+            // var vox_ray = ray_in;
+            // vox_ray.orig -= prev_node.min.xyz;
+
+            // let test_t = intersect_aabb(
+            //     vox_ray,
+            //     vec3(0.0),
+            //     vec3(36.0, 256.0, 36.0),
+            // );
+
+            // vox_ray.orig += ray_in.dir * prev_t;
+
+            let tmp_hit = traver_voxel_ug(
+                ray_in,
+                node.offset,
+                prev_node.min.xyz,
+                prev_node.max.xyz,
+                prev_t
+            );
+            // let tmp_hit = traver_voxel_ug(
+            //     vox_ray,
+            //     prev_node.min.xyz,
+            //     node.offset,
+            //     prev_t
+            // );
+
+            if tmp_hit.hit_data != 0u && tmp_hit.t < hit.dist {
+                hit.dist = tmp_hit.t;
+                hit.material = tmp_hit.hit_data;
+                hit.normal = get_normal(tmp_hit.side, tmp_hit.step_amount);
+            }
+
+            // last_t = prev_t;
+
+            // let tmp_hit = traverse_voxels(ray_in, prev_node.min.xyz, node.offset);
+            // if tmp_hit.dist < hit.dist {
+            //     hit = tmp_hit;
             // }
             continue;
         }
@@ -360,14 +664,35 @@ fn bvh_traverse_chunks(ray_in: Ray) -> BvhVoxelHit {
 
         if t > 0.0 {
             node_idx = node.entry;
-            prev_t = t;
             prev_node = node;
+            prev_t = t;
         } else {
             node_idx = node.exit;
         }
     }
 
-    // hit.dist = f32(iter);
+
+    // hit.dist = F32_MAX;
+    // hit.material = 0u;
+
+    // var vox_ray = ray_in;
+    //         // vox_ray.orig -= prev_node.min.xyz;
+    // let min_bound = vec3(0.0, 0.0, 0.0) * vec3(36.0, 256.0, 36.0);
+
+    // vox_ray.orig += min_bound;
+    // vox_ray.orig = vox_ray.orig + ray_in.dir * 9.5;
+    // let tmp_hit = traver_voxel_ug(
+    //     vox_ray,
+    //     vec3(0.0),
+    //     0u,
+    // );
+
+    // if tmp_hit != F32_MAX {
+    //     hit.dist = tmp_hit;
+
+    //     hit.material = 1u;
+    // }
+
     return hit;
 }
 
@@ -414,7 +739,8 @@ fn brdf(
 
     if material == 3u {
         *specular_bounce = true;
-        return (reflect(ray_dir, -normal));
+        // return (reflect(ray_dir, normal));
+        return normalize(reflect(ray_dir, -normal) + getCosineWeightedSample(seed, normal) * 0.1);
     } else {
         return getCosineWeightedSample(seed, normal);
     }
@@ -426,22 +752,28 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
     var specular_bounce = true;
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
 
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 4; i++) {
         var voxel_hit = bvh_traverse_chunks(ray);
 
-        if voxel_hit.material == 0u {
+        if voxel_hit.material == 0u || voxel_hit.dist == F32_MAX {
             color += (vec3(161.0 / 255.0, 247.0 / 255.0, 1.0) * 0.0) * throughput;
             break;
         }
 
         voxel_hit.point = ray_in.orig + ray_in.dir * voxel_hit.dist;
-        voxel_hit.normal = normal_cube(voxel_hit.point, vec3(0.0), voxel_hit.aabb_min, voxel_hit.aabb_max);
+        // voxel_hit.normal = normal_cube(voxel_hit.point, vec3(0.0), voxel_hit.aabb_min, voxel_hit.aabb_max);
 
         if i == 0 {
             textureStore(normal_output, screen_pos, voxel_hit.normal.xyzz);
         }
 
         var vox_color = voxel_hit.normal * 0.5 + 0.5;
+
+        // if i == 1 {
+        //     return vox_color;
+        // }
+        // throughput *= vox_color;
+
         // vox_color = vec3(0.1, 0.3, 0.6);
 
         ray.orig = voxel_hit.point + voxel_hit.normal * 0.0001;
@@ -452,7 +784,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         }
 
         ray.dir = brdf(seed, voxel_hit.normal, ray.dir, voxel_hit.material, &specular_bounce);
-        
+
         if !specular_bounce || dot(ray.dir, voxel_hit.normal) < 0.0 {
             throughput *= vox_color;
         }
@@ -489,9 +821,10 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     if hit.material != 0u {
         hit.point = ray_in.orig + ray_in.dir * hit.dist;
 
-        hit.normal = normal_cube(hit.point, vec3(0.0), hit.aabb_min, hit.aabb_max);
-
-        return vec3(hit.normal * 0.5 + 0.5);
+        // hit.normal = normal_cube(hit.point, vec3(0.0), hit.aabb_min, hit.aabb_max);
+        // return vec3(hit.dist / 300.0, 0.4, 0.4);
+        // return vec3(hit.normal * 0.5 + 0.5);
+        return vec3(hit.dist / 300.0);
         // return vec3(hit.dist / 300.0);
     }
 
@@ -500,7 +833,7 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     // }
 
     return vec3(
-        0.00,
+        0.02,
         0.00,
         0.00
     );
@@ -537,15 +870,15 @@ fn main(
     var final_color = vec3<f32>(0.0, 0.0, 0.0);
     var seed: u32 = (u32(screen_pos.x) * (1973u) + u32(screen_pos.y) * (9277u) * (26699u)) | (1u);
 
-    let MAX_SAMPLES = 1;
+    let MAX_SAMPLES = 0;
 
     ray.dir = vec_rot_x(ray.dir, -0.65);
-    // ray.dir = vec_rot_y(ray.dir, -2.4);
+    // ray.dir = vec_rot_y(ray.dir, -1.9);
     precalc_ray(&ray);
 
     for (var i = 0; i < MAX_SAMPLES; i++) {
         // seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
-        seed = (u32(screen_pos.x ) * 1973u + u32(screen_pos.y ) * 9277u + u32(i) * 26699u) | (1u);
+        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // seed = (u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // wang_hash(&seed);
 
@@ -568,5 +901,5 @@ fn main(
 
     textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
     textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
-    // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
+    textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }

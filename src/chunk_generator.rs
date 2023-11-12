@@ -234,18 +234,6 @@ impl Chunk {
             node_index: 0,
         });
 
-        voxels_gen.push(VoxelGenerated {
-            chunk_position: [
-                ((position[0]) * CHUNK_X as i32),
-                0,
-                ((position[2]) * CHUNK_Z as i32),
-            ],
-            // position: [pos[0] as u32, y as u32, pos[1] as u32],
-            position: [20, 33, 20],
-            voxel_type: 3,
-            node_index: 0,
-        });
-
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
                 voxels_gen.push(VoxelGenerated {
@@ -258,6 +246,8 @@ impl Chunk {
                     voxel_type: 3,
                     node_index: 0,
                 });
+                let index = (z * CHUNK_X * CHUNK_Y) + (24 * CHUNK_X) + x;
+                self.chunks_mem[chunk_offset + index] = 3;
             }
         }
         for x in 0..CHUNK_X {
@@ -286,10 +276,10 @@ impl Chunk {
                 //         node_index: 0,
                 //     })
                 // }
-                let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
-                self.chunks_mem[chunk_offset + index] = 1;
+                // let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+                // self.chunks_mem[chunk_offset + index] = 1;
 
-                for y in (y - 2..y).rev() {
+                for y in (y - 4..y).rev() {
                     if y == 26 || y == 33 {
                         continue;
                     }
@@ -303,7 +293,10 @@ impl Chunk {
                         position: [x as u32, y as u32, z as u32],
                         voxel_type: 1,
                         node_index: 0,
-                    })
+                    });
+
+                    let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
+                    self.chunks_mem[chunk_offset + index] = 1;
                 }
 
                 // 331776 / 995326 = 0.33333400313063255

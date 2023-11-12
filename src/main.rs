@@ -246,10 +246,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     .unwrap();
 
     watcher
-        .watch(
-            Path::new("./shaders/"),
-            RecursiveMode::NonRecursive,
-        )
+        .watch(Path::new("./shaders/"), RecursiveMode::NonRecursive)
         .expect("TODO: panic message");
 
     let app = app_arc.clone();
@@ -358,7 +355,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 // tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
                 // tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
-                // tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
+                tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 app.window.request_redraw();
             }
 
