@@ -234,6 +234,18 @@ impl Chunk {
             node_index: 0,
         });
 
+        voxels_gen.push(VoxelGenerated {
+            chunk_position: [
+                ((position[0]) * CHUNK_X as i32),
+                0,
+                ((position[2]) * CHUNK_Z as i32),
+            ],
+            // position: [pos[0] as u32, y as u32, pos[1] as u32],
+            position: [20, 33, 20],
+            voxel_type: 3,
+            node_index: 0,
+        });
+
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
                 voxels_gen.push(VoxelGenerated {
@@ -278,7 +290,7 @@ impl Chunk {
                 self.chunks_mem[chunk_offset + index] = 1;
 
                 for y in (y - 2..y).rev() {
-                    if y == 26 {
+                    if y == 26 || y == 33 {
                         continue;
                     }
                     voxels_gen.push(VoxelGenerated {

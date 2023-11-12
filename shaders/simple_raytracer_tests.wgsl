@@ -141,13 +141,12 @@ fn getCosineWeightedSample(seed: ptr<function, u32>, dir: vec3<f32>) -> vec3<f32
 // ===========================================================
 
 fn vec_rot_x(in: vec3<f32>, rad: f32) -> vec3<f32> {
-    var	n = vec3<f32>(0.0);
 
-
-    n.x = in.x;
-    n.y = in.y * cos(rad) + in.z * -sin(rad);
-    n.z = in.y * sin(rad) + in.z * cos(rad);
-    return (n);
+    return vec3(
+        in.x,
+        in.y * cos(rad) + in.z * -sin(rad),
+        in.y * sin(rad) + in.z * cos(rad),
+    );
 }
 
 fn vec_rot_y(in: vec3<f32>, rad: f32) -> vec3<f32> {
@@ -379,8 +378,6 @@ fn fresnel(cosEN: f32, in: vec3<f32>) -> vec3<f32> {
     return (1.0 - e5) * in + e5;
 }
 
-fn brdf() {}
-
 fn sample_sunlight(seed: ptr<function, u32>, hit_point: vec3<f32>, hit_normal: vec3<f32>) -> vec3<f32> {
     let sun_position = vec3(200.0, 600.0, -500.0);
     let light_vec = sun_position - hit_point;
@@ -406,10 +403,28 @@ fn sample_sunlight(seed: ptr<function, u32>, hit_point: vec3<f32>, hit_normal: v
     return vec3(0.0);
 }
 
+fn brdf(
+    seed: ptr<function, u32>,
+    normal: vec3<f32>,
+    ray_dir: vec3<f32>,
+    material: u32,
+    specular_bounce: ptr<function, bool>,
+) -> vec3<f32> {
+    *specular_bounce = false;
+
+    if material == 3u {
+        *specular_bounce = true;
+        return (reflect(ray_dir, -normal));
+    } else {
+        return getCosineWeightedSample(seed, normal);
+    }
+}
+
 fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> vec3<f32> {
     var throughput: vec3<f32> = vec3(1.0, 1.0, 1.0);
-    var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
     var ray = ray_in;
+    var specular_bounce = true;
+    var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
 
     for (var i = 0; i < 6; i++) {
         var voxel_hit = bvh_traverse_chunks(ray);
@@ -427,67 +442,37 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         }
 
         var vox_color = voxel_hit.normal * 0.5 + 0.5;
-        vox_color = vec3(0.1, 0.3, 0.6);
+        // vox_color = vec3(0.1, 0.3, 0.6);
 
         ray.orig = voxel_hit.point + voxel_hit.normal * 0.0001;
-
-    
-
-        // temporary direct light sampling
-        // let sun_position = vec3(200.0, 255.0, -200.0);
-        // let light_dir = normalize(sun_position - voxel_hit.point);
-
-        if voxel_hit.material == 1u {
-            throughput *= vox_color;
-            // ray.dir = normalize(random_unit_vector(seed) + voxel_hit.normal);
-            ray.dir = getCosineWeightedSample(seed, voxel_hit.normal);
-
-            color += throughput * sample_sunlight(seed, voxel_hit.point, voxel_hit.normal);
-            // let light_pos = (vec3(100.0, 200.0, 100.0));
-            // let light_dir = light_pos - voxel_hit.point;
-            // let light_dir_nl = normalize(light_dir);
-
-            // // let light_dir = vec3(1.0, 1.0, -1.0);
-            // let sun_direction = normalize(sample_cone(seed, light_dir, 0.001));
-            // let n_light = clamp(dot(voxel_hit.normal, sun_direction), 0.0, 1.0);
-
-            // let light_cosine = abs(light_dir_nl.y);
-            // let dst_squared = dot(light_dir, light_dir);
-            // let  pdf = max(0.0001, dst_squared / (light_cosine * 5300.0));
-
-            // // color += throughput * vec3(0.3, 0.3, 0.3);
-
-            // if n_light > 0.0 {
-            //     var shadow_ray = ray;
-            //     shadow_ray.dir = normalize(sun_direction);
-            //     precalc_ray(&shadow_ray);
-            //     let shadow_hit = bvh_traverse_chunks(shadow_ray);
-
-
-            //     // let cos_a_max = sqrt(1.0 - clamp(3.0 / dot(light_dir, light_dir), 0., 1.));
-            //     // let weight = 2. * (1. - cos_a_max);
-
-            //     var light_color = vox_color * (vec3(1.0, 1.0, 1.0) * n_light);
-
-            //     if shadow_hit.material != 0u && shadow_hit.dist < voxel_hit.dist {
-            //         light_color *= 0.0;
-            //     } else {
-            //     // throughput += light_color;
-            //         color += (throughput * light_color) ;
-            //     }
-            // }
-        }
-
-        if voxel_hit.material == 3u {
-            // vox_color = vec3(0.1, 0.7, 0.9);
-            throughput *= vec3(0.1, 0.7, 0.9);
-            ray.dir = normalize(reflect(ray.dir, voxel_hit.normal) + getCosineWeightedSample(seed, voxel_hit.normal) * 0.02);
-        }
 
         if voxel_hit.material == 2u {
             color += throughput * vec3(1.0, 1.0, 1.0) ;
             break;
         }
+
+        ray.dir = brdf(seed, voxel_hit.normal, ray.dir, voxel_hit.material, &specular_bounce);
+        
+        if !specular_bounce || dot(ray.dir, voxel_hit.normal) < 0.0 {
+            throughput *= vox_color;
+        }
+
+        if !specular_bounce {
+            color += throughput * sample_sunlight(seed, voxel_hit.point, voxel_hit.normal);
+        }
+        // if voxel_hit.material == 1u {
+        //     throughput *= vox_color;
+        //     // ray.dir = normalize(random_unit_vector(seed) + voxel_hit.normal);
+        //     ray.dir = getCosineWeightedSample(seed, voxel_hit.normal);
+
+        //     color += throughput * sample_sunlight(seed, voxel_hit.point, voxel_hit.normal);
+        // }
+
+        // if voxel_hit.material == 3u {
+        //     throughput *= vec3(1.0, 1.0, 1.0);
+        //     ray.dir = normalize(reflect(ray.dir, voxel_hit.normal) + getCosineWeightedSample(seed, voxel_hit.normal) * 0.02);
+        // }
+
 
         precalc_ray(&ray);
     }
@@ -560,7 +545,7 @@ fn main(
 
     for (var i = 0; i < MAX_SAMPLES; i++) {
         // seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
-        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+        seed = (u32(screen_pos.x ) * 1973u + u32(screen_pos.y ) * 9277u + u32(i) * 26699u) | (1u);
         // seed = (u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // wang_hash(&seed);
 

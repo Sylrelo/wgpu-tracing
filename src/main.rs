@@ -247,7 +247,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     watcher
         .watch(
-            Path::new("E:\\Dev\\test-ray\\shaders\\"),
+            Path::new("./shaders/"),
             RecursiveMode::NonRecursive,
         )
         .expect("TODO: panic message");

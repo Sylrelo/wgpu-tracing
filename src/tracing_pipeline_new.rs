@@ -170,7 +170,7 @@ impl TracingPipelineTest {
         });
 
         device.create_compute_pipeline(&ComputePipelineDescriptor {
-            label: Label::from("Tracing Pipeline"),
+            label: Label::from("Tracing Pipeline New"),
             layout: Some(&pipeline_layout),
             module: shader_module,
             entry_point: "main",
