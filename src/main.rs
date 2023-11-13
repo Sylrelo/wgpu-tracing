@@ -97,7 +97,7 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [80.0, 50.0, 190.0, 0.0],
+        position: [0.0, 50.0, 0.0, 0.0],
         // position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
@@ -354,7 +354,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .buffer_bvh_chunk_voxels_update(&app.queue, &chunks.bvh_chunk_voxels);
 
                 tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
-                // tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
+                tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
                 tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 app.window.request_redraw();
             }

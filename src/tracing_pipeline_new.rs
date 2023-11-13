@@ -35,13 +35,13 @@ pub struct TracingPipelineBuffers {
     // pub chunks_size: u32,
     pub uniform: Buffer,
 
-    // pub root_grid: Buffer,
+    pub root_grid: Buffer,
     // pub test_bvh_buffer: Buffer,
     // pub test_uniform_grid_chunks: Buffer,
     pub bvh_chunks: Buffer,
     pub bvh_chunk_voxels: Buffer,
 
-pub root_chunks: Buffer
+    pub root_chunks: Buffer,
 }
 
 pub struct TracingPipelineTest {
@@ -133,13 +133,13 @@ impl TracingPipelineTest {
         );
     }
 
-    // pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<[i32; 4]>) {
-    //     queue.write_buffer(
-    //         &self.buffers.root_grid,
-    //         0,
-    //         bytemuck::cast_slice(grid.as_slice()),
-    //     );
-    // }
+    pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<[i32; 4]>) {
+        queue.write_buffer(
+            &self.buffers.root_grid,
+            0,
+            bytemuck::cast_slice(grid.as_slice()),
+        );
+    }
 
     pub fn uniform_settings_update(&self, queue: &Queue, settings: TracingPipelineSettings) {
         queue.write_buffer(&self.buffers.uniform, 0, bytemuck::cast_slice(&[settings]));
@@ -218,13 +218,13 @@ impl TracingPipelineTest {
             .done()
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             // .done()
-            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
-            // .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunks, true)
             .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunk_voxels, true)
             .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_chunks, true)
+            .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
             .done()
             // .with_default_buffer_storage(
             //     ShaderStages::COMPUTE,
@@ -257,12 +257,12 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
-        // let root_grid = device.create_buffer(&BufferDescriptor {
-        //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
-        //     mapped_at_creation: false,
-        //     size: 30 * 30 * 16,
-        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        // });
+        let root_grid = device.create_buffer(&BufferDescriptor {
+            label: Label::from("Tracing Pipeline : ROOT GRID"),
+            mapped_at_creation: false,
+            size: 30 * 30 * 16,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
 
         let bvh_chunks = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunks Buffer"),
@@ -287,10 +287,10 @@ impl TracingPipelineTest {
             // chunks_size: 300 * 8,
             uniform,
 
-            // root_grid,
+            root_grid,
             bvh_chunks,
             bvh_chunk_voxels,
-            root_chunks
+            root_chunks,
         }
     }
 }

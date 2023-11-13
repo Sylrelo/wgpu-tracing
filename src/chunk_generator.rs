@@ -485,33 +485,33 @@ impl Chunk {
         // exit(0);
 
         // self.generated_chunks_gpubvh.clear();
-        // self.root_grid.resize(30 * 30, [0; 4]);
+        self.root_grid.resize(30 * 30, [0; 4]);
 
-        // for x in 0..30 {
-        //     for z in 0..30 {
-        //         let chunk_pos = [15 - (x), 0, 15 - (z), 0];
+        for x in 0..30 {
+            for z in 0..30 {
+                let chunk_pos = [(x), 0, (z), 0];
 
-        //         let chk = self.generated_chunks.get(&chunk_pos);
-        //         self.root_grid[(x + z * 30) as usize] = [0, 0, 0, 0];
+                let chk = self.generated_chunks.get(&chunk_pos);
+                self.root_grid[(x + z * 30) as usize] = [0, 0, 0, 0];
 
-        //         if chk.is_none() {
-        //             print!("       | ");
-        //         } else {
-        //             // print!("{:5} | ", self.root_grid[x + z * 20]);
-        //             let val = chk.unwrap();
-        //             // print!("{:8} | ", val * CHUNK_TSIZE + 1);
-        //             print!("{:2}  {:2} | ", chunk_pos[0], chunk_pos[2]);
-        //             self.root_grid[(x + z * 30) as usize] = [
-        //                 (15 - (x)) * CHUNK_X as i32,
-        //                 0,
-        //                 (15 - (z)) * CHUNK_Z as i32,
-        //                 (*val as i32) * CHUNK_TSIZE as i32 + 1,
-        //             ];
-        //         }
-        //     }
-        //     println!("");
-        // }
-        // println!("-> {}", self.root_chunks.len() * 16);
+                if chk.is_none() {
+                    print!("       | ");
+                } else {
+                    // print!("{:5} | ", self.root_grid[x + z * 20]);
+                    let val = chk.unwrap();
+                    // print!("{:8} | ", val * CHUNK_TSIZE + 1);
+                    print!("{:2}  {:2} | ", chunk_pos[0], chunk_pos[2]);
+                    self.root_grid[(x + z * 30) as usize] = [
+                        (chunk_pos[0]) * CHUNK_X as i32,
+                        0,
+                        (chunk_pos[2]) * CHUNK_Z as i32,
+                        (*val as i32) * CHUNK_MEM_OFFSET as i32 + 1,
+                    ];
+                }
+            }
+            println!("");
+        }
+        println!("-> {}", self.generated_chunks.len());
         // println!("{:?} {:?}", player_pos, player_pos_chunk);
 
         // println!("Tot {} ({} ms)", a, start_timer.elapsed().as_millis());
