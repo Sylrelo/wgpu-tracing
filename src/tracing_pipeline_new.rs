@@ -40,6 +40,8 @@ pub struct TracingPipelineBuffers {
     // pub test_uniform_grid_chunks: Buffer,
     pub bvh_chunks: Buffer,
     pub bvh_chunk_voxels: Buffer,
+
+pub root_chunks: Buffer
 }
 
 pub struct TracingPipelineTest {
@@ -86,7 +88,7 @@ impl TracingPipelineTest {
     pub fn exec_pass(&self, encoder: &mut CommandEncoder) {
         let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: None,
-            timestamp_writes: None,
+            // timestamp_writes: None,
         });
 
         compute_pass.set_pipeline(&self.pipeline);
@@ -98,13 +100,13 @@ impl TracingPipelineTest {
 
     // ===============================
 
-    // pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
-    //     queue.write_buffer(
-    //         &self.buffers.chunks,
-    //         0,
-    //         bytemuck::cast_slice(chunks.as_slice()),
-    //     );
-    // }
+    pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
+        queue.write_buffer(
+            &self.buffers.root_chunks,
+            0,
+            bytemuck::cast_slice(chunks.as_slice()),
+        );
+    }
 
     pub fn buffer_bvh_chunks_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
         queue.write_buffer(
@@ -214,8 +216,6 @@ impl TracingPipelineTest {
         BindingGeneratorBuilder::new(device)
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunk_content, true)
             .done()
-            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunks, true)
-            // .done()
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             // .done()
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
@@ -223,6 +223,8 @@ impl TracingPipelineTest {
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunks, true)
             .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunk_voxels, true)
+            .done()
+            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_chunks, true)
             .done()
             // .with_default_buffer_storage(
             //     ShaderStages::COMPUTE,
@@ -248,12 +250,12 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
-        // let chunks = device.create_buffer(&BufferDescriptor {
-        //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
-        //     mapped_at_creation: false,
-        //     size: 499 * 16,
-        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        // });
+        let root_chunks = device.create_buffer(&BufferDescriptor {
+            label: Label::from("Tracing Pipeline : Chunks Buffer"),
+            mapped_at_creation: false,
+            size: 499 * 16,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        });
 
         // let root_grid = device.create_buffer(&BufferDescriptor {
         //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
@@ -288,6 +290,7 @@ impl TracingPipelineTest {
             // root_grid,
             bvh_chunks,
             bvh_chunk_voxels,
+            root_chunks
         }
     }
 }

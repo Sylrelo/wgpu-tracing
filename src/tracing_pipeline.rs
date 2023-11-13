@@ -84,7 +84,7 @@ impl TracingPipeline {
     pub fn compute_pass(&self, encoder: &mut CommandEncoder) {
         let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: None,
-            timestamp_writes: None,
+            // timestamp_writes: None,
         });
 
         compute_pass.set_pipeline(&self.pipeline);

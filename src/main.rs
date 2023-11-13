@@ -353,7 +353,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 tracing_pipeline_new
                     .buffer_bvh_chunk_voxels_update(&app.queue, &chunks.bvh_chunk_voxels);
 
-                // tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
+                tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
                 // tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
                 tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 app.window.request_redraw();
@@ -441,15 +441,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
-                        occlusion_query_set: None,
-                        timestamp_writes: None,
+                        // occlusion_query_set: None,
+                        // timestamp_writes: None,
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
 
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: wgpu::StoreOp::Store,
+                                store: true,
+                                // store: wgpu::StoreOp::Store,
                             },
                         })],
                         depth_stencil_attachment: None,
