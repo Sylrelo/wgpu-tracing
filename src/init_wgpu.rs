@@ -81,8 +81,8 @@ impl InitWgpu {
             format: swapchain_config.format,
             width: size.width,
             height: size.height,
-            // present_mode: wgpu::PresentMode::Immediate,
-            present_mode: wgpu::PresentMode::AutoVsync,
+            present_mode: wgpu::PresentMode::Immediate,
+            // present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: swapchain_config.capabilities.alpha_modes[0],
             view_formats: vec![],
         }

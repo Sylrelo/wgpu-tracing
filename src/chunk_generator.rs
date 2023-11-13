@@ -13,9 +13,12 @@ use bvh::{
 
 use perlin2d::PerlinNoise2D;
 
-const CHUNK_X: usize = 36;
-const CHUNK_Y: usize = 256;
-const CHUNK_Z: usize = 36;
+// const CHUNK_X: usize = 36;
+// const CHUNK_Y: usize = 256;
+// const CHUNK_Z: usize = 36;
+const CHUNK_X: usize = 64;
+const CHUNK_Y: usize = 64;
+const CHUNK_Z: usize = 64;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
 pub const CHUNK_MEM_OFFSET: usize = 1000000; // 995326;
 const CHUNK_RADIUS: i32 = 6;

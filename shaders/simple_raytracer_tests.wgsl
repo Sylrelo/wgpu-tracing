@@ -63,9 +63,9 @@ var color_output2: texture_storage_2d<rgba8unorm, write>;
 const M_PI = 3.1415926535897932384626433832795;
 const M_TWOPI = 6.28318530718;
 const F32_MAX = 3.402823E+38;
-const CHUNK_XMAX = 36;
-const CHUNK_YMAX = 256;
-const CHUNK_ZMAX = 36;
+const CHUNK_XMAX = 64;
+const CHUNK_YMAX = 64;
+const CHUNK_ZMAX = 64;
 // const CHUNK_TSIZE = CHUNK_XMAX * CHUNK_YMAX * CHUNK_ZMAX;
 const CHUNK_TSIZE = 331776;
 
@@ -412,7 +412,7 @@ fn dda_prepare_scratch(
     aabb_tmin: f32,
 ) -> DataDda {
     var dda: DataDda;
-    let resolution = vec3(36, 256, 36);
+    let resolution = vec3(CHUNK_XMAX, CHUNK_YMAX, CHUNK_XMAX);
     // let cell_dimensions = vec3(1.0, 1.0, 1.0);
 
     let ray_orig_cell = (ray_in.orig + ray_in.dir * aabb_tmin) - grid_min;
@@ -810,23 +810,23 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
     var specular_bounce = true;
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
 
-    for (var i = 0; i < 3; i++) {
-        var voxel_hit = bvh_traverse_chunks(ray);
-        // let hit = traverse_root_grid(ray_in);
+    for (var i = 0; i < 4; i++) {
+        // var voxel_hit = bvh_traverse_chunks(ray);
+        let voxel_hit = traverse_root_grid(ray_in);
 
-        if voxel_hit.material == 0u || voxel_hit.dist == F32_MAX {
-            color += (vec3(161.0 / 255.0, 247.0 / 255.0, 1.0) * 0.0) * throughput;
+        if voxel_hit.hit_data == 0u || voxel_hit.t == F32_MAX {
+            color += (vec3(161.0 / 255.0, 247.0 / 255.0, 1.0) * 1.0) * throughput;
             break;
         }
 
-        voxel_hit.point = ray_in.orig + ray_in.dir * voxel_hit.dist;
-        // voxel_hit.normal = normal_cube(voxel_hit.point, vec3(0.0), voxel_hit.aabb_min, voxel_hit.aabb_max);
+        let point = ray_in.orig + ray_in.dir * voxel_hit.t;
+        let normal = get_normal(voxel_hit.side, voxel_hit.step_amount);
 
         if i == 0 {
-            textureStore(normal_output, screen_pos, voxel_hit.normal.xyzz);
+            textureStore(normal_output, screen_pos, normal.xyzz);
         }
 
-        var vox_color = voxel_hit.normal * 0.5 + 0.5;
+        var vox_color = normal * 0.5 + 0.5;
 
         // if i == 1 {
         //     return vox_color;
@@ -835,21 +835,21 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
 
         // vox_color = vec3(0.1, 0.3, 0.6);
 
-        ray.orig = voxel_hit.point + voxel_hit.normal * 0.0001;
+        ray.orig = point + normal * 0.0001;
 
-        if voxel_hit.material == 2u {
+        if voxel_hit.hit_data == 2u {
             color += throughput * vec3(1.0, 1.0, 1.0) ;
             break;
         }
 
-        ray.dir = brdf(seed, voxel_hit.normal, ray.dir, voxel_hit.material, &specular_bounce);
+        ray.dir = brdf(seed, normal, ray.dir, voxel_hit.hit_data, &specular_bounce);
 
-        if !specular_bounce || dot(ray.dir, voxel_hit.normal) < 0.0 {
+        if !specular_bounce || dot(ray.dir, normal) < 0.0 {
             throughput *= vox_color;
         }
 
         if !specular_bounce {
-            color += throughput * sample_sunlight(seed, voxel_hit.point, voxel_hit.normal);
+            color += throughput * sample_sunlight(seed, point, normal);
         }
         // if voxel_hit.material == 1u {
         //     throughput *= vox_color;
@@ -883,7 +883,7 @@ fn traverse_root_grid(
         ray_chunks,
         vec3(0.0),
         vec3(0.0),
-        vec3(36.0, 256.0, 36.0),
+        vec3<f32>(vec3(CHUNK_XMAX, CHUNK_YMAX, CHUNK_XMAX)),
         0.0
     );
 
@@ -924,7 +924,7 @@ fn traverse_root_grid(
             let t = intersect_aabb(
                 ray_in,
                 vec3<f32>(grid_hit.xyz),
-                vec3<f32>(grid_hit.xyz) + vec3(36.0, 256.0, 36.0),
+                vec3<f32>(grid_hit.xyz) + vec3<f32>(vec3(CHUNK_XMAX, CHUNK_YMAX, CHUNK_XMAX)),
             );
 
             // if t > 0.0 && t < last_t {
@@ -937,7 +937,7 @@ fn traverse_root_grid(
                 ray_in,
                 u32(grid_hit.w - 1),
                 vec3<f32>(grid_hit.xyz),
-                vec3<f32>(grid_hit.xyz) + vec3(36.0, 256.0, 36.0),
+                vec3<f32>(grid_hit.xyz) + vec3<f32>(vec3(CHUNK_XMAX, CHUNK_YMAX, CHUNK_XMAX)),
                 t
             );
             if tmp_voxel_hit.hit_data != 0u && tmp_voxel_hit.t < voxel_hit.t {
@@ -990,34 +990,51 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
 
 
     if true {
-        let hit = traverse_root_grid(ray_in);
+        var final_color = vec3(0.0);
 
-        if hit.hit_data != 0u {
-            let  normal = get_normal(hit.side, hit.step_amount);
-            return vec3(normal * 0.5 + 0.5 * (hit.t / 100.0));
-            // return vec3(hit.t / 350.0);
-        } else if hit.t != F32_MAX {
-            return vec3(hit.t / 300.0);
+        for (var i = 0; i < 12; i++) {
+            var ray = ray_in;
+
+            ray.orig.x += f32(6 - i) * 0.01;
+            ray.orig.z += f32(6 - i) * 0.01;
+
+            let hit = traverse_root_grid(ray);
+
+            if hit.hit_data != 0u {
+                let  normal = get_normal(hit.side, hit.step_amount);
+                final_color += normal * 0.5 + 0.5 * (hit.t / 100.0);
+            }
         }
+
+        return final_color / 12.0;
+        // let hit = traverse_root_grid(ray_in);
+
+        // if hit.hit_data != 0u {
+        //     let  normal = get_normal(hit.side, hit.step_amount);
+        //     return vec3(normal * 0.5 + 0.5 * (hit.t / 100.0));
+        //     // return vec3(hit.t / 350.0);
+        // } else if hit.t != F32_MAX {
+        //     return vec3(hit.t / 300.0);
+        // }
     }
 
-    var hit = bvh_traverse_chunks(ray_in);
+    // var hit = bvh_traverse_chunks(ray_in);
 
-    // hit = traverse_voxels(ray_in, vec3(0.0), 0u);
+    // // hit = traverse_voxels(ray_in, vec3(0.0), 0u);
 
-    if hit.material != 0u {
-        hit.point = ray_in.orig + ray_in.dir * hit.dist;
+    // if hit.material != 0u {
+    //     hit.point = ray_in.orig + ray_in.dir * hit.dist;
 
-        // hit.normal = normal_cube(hit.point, vec3(0.0), hit.aabb_min, hit.aabb_max);
-        // return vec3(hit.dist / 300.0, 0.4, 0.4);
-        return vec3(hit.normal * 0.5 + 0.5) * 0.01;
-        // return vec3(hit.dist / 300.0);
-        // return vec3(hit.dist / 300.0);
-    }
-
-    // if prev_t != F32_MAX {
-    //     return vec3(iter / 1500.0, 0.0, 0.0);
+    //     // hit.normal = normal_cube(hit.point, vec3(0.0), hit.aabb_min, hit.aabb_max);
+    //     // return vec3(hit.dist / 300.0, 0.4, 0.4);
+    //     return vec3(hit.normal * 0.5 + 0.5) * 0.01;
+    //     // return vec3(hit.dist / 300.0);
+    //     // return vec3(hit.dist / 300.0);
     // }
+
+    // // if prev_t != F32_MAX {
+    // //     return vec3(iter / 1500.0, 0.0, 0.0);
+    // // }
 
     return vec3(
         0.02,
