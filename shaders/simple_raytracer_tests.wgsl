@@ -416,6 +416,7 @@ fn dda_prepare_scratch(
     // let cell_dimensions = vec3(1.0, 1.0, 1.0);
 
     let ray_orig_cell = (ray_in.orig + ray_in.dir * aabb_tmin) - grid_min;
+    // dda.map = vec3<i32>(floor(ray_orig_cell / cell_dimensions));
     dda.map = clamp(vec3<i32>(floor(ray_orig_cell / cell_dimensions)), vec3(0), resolution);
 
 
@@ -586,7 +587,7 @@ fn traver_voxel_ug(
         return dda;
     }
 
-    while iter < 180u && dda.hit_data == 0u {
+    while iter < 140u && dda.hit_data == 0u {
         iter++;
         dda_steps(ray_in, &dda);
 
@@ -777,9 +778,10 @@ fn sample_sunlight(seed: ptr<function, u32>, hit_point: vec3<f32>, hit_normal: v
     let inv_prob = 2.0 * (1.0 - cos(theta)) * 50.0;
     let light_val = clamp(dot(hit_normal, light_dir), 0.0, 1.0);
 
-    let shadow_hit = bvh_traverse_chunks(shadow_ray);
+    // let shadow_hit = bvh_traverse_chunks(shadow_ray);
+    let shadow_hit = traverse_root_grid(shadow_ray);
 
-    if shadow_hit.material == 0u {
+    if shadow_hit.hit_data == 0u {
         return vec3(1.0) * light_val * inv_prob;
     }
 
@@ -798,8 +800,9 @@ fn brdf(
     if material == 3u {
         *specular_bounce = true;
         // return (reflect(ray_dir, normal));
-        return normalize(reflect(ray_dir, -normal) + getCosineWeightedSample(seed, normal) * 0.1);
+        return normalize(reflect(ray_dir, -normal) + getCosineWeightedSample(seed, normal) * 0.05);
     } else {
+        // return random_unit_vector(seed);
         return getCosineWeightedSample(seed, normal);
     }
 }
@@ -810,17 +813,18 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
     var specular_bounce = true;
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
 
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 3; i++) {
         // var voxel_hit = bvh_traverse_chunks(ray);
-        let voxel_hit = traverse_root_grid(ray_in);
+        let voxel_hit = traverse_root_grid(ray);
 
         if voxel_hit.hit_data == 0u || voxel_hit.t == F32_MAX {
-            color += (vec3(161.0 / 255.0, 247.0 / 255.0, 1.0) * 1.0) * throughput;
+            color += (vec3(161.0 / 255.0, 247.0 / 255.0, 1.0) * 0.0) * throughput;
             break;
         }
 
-        let point = ray_in.orig + ray_in.dir * voxel_hit.t;
-        let normal = get_normal(voxel_hit.side, voxel_hit.step_amount);
+        let point = ray.orig + ray.dir * voxel_hit.t;
+        // let normal = get_normal(voxel_hit.side, voxel_hit.step_amount);
+        let normal = vec3<f32>(voxel_hit.mask) * -sign(vec3<f32>(voxel_hit.step_amount));
 
         if i == 0 {
             textureStore(normal_output, screen_pos, normal.xyzz);
@@ -837,10 +841,10 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
 
         ray.orig = point + normal * 0.0001;
 
-        if voxel_hit.hit_data == 2u {
-            color += throughput * vec3(1.0, 1.0, 1.0) ;
-            break;
-        }
+        // if voxel_hit.hit_data == 2u {
+        //     color += throughput * vec3(1.0, 1.0, 1.0) ;
+        //     break;
+        // }
 
         ray.dir = brdf(seed, normal, ray.dir, voxel_hit.hit_data, &specular_bounce);
 
@@ -849,6 +853,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         }
 
         if !specular_bounce {
+            // color += throughput;
             color += throughput * sample_sunlight(seed, point, normal);
         }
         // if voxel_hit.material == 1u {
@@ -877,6 +882,7 @@ fn traverse_root_grid(
 ) -> DataDda {
 
     var ray_chunks = ray_in;
+    // ray_chunks.orig.y = 44.0;
 
     // ray_chunks.orig += vec3(.0, 0.0, 16.0);
     var dda: DataDda = dda_prepare_scratch(
@@ -900,6 +906,55 @@ fn traverse_root_grid(
 
     var last_t = F32_MAX;
 
+
+    if true {
+        var node_idx = 0u;
+        var prev_t = F32_MAX;
+        var prev_node: GpuBvhNode;
+        var last_t = F32_MAX;
+        while node_idx < settings.root_chunk_count {
+            let node = bvh_root_chunks[node_idx];
+
+            if node.entry == 4294967295u {
+                node_idx = node.exit;
+
+                if prev_t < last_t {
+                    last_t = prev_t;
+                }
+
+                let tmp_hit = traver_voxel_ug(
+                    ray_in,
+                    node.offset,
+                    prev_node.min.xyz,
+                    prev_node.max.xyz,
+                    prev_t
+                );
+                if tmp_hit.hit_data != 0u && tmp_hit.t < voxel_hit.t {
+                    // voxel_hit.t = tmp_hit.t;
+                    // voxel_hit.hit_data = tmp_hit.hit_data;
+                    voxel_hit = tmp_hit;
+                }
+                continue;
+            }
+
+            let t = intersect_aabb(
+                ray_in,
+                node.min.xyz,
+                node.max.xyz,
+            );
+
+            if t > 0.0 {
+                node_idx = node.entry;
+                prev_node = node;
+                prev_t = t;
+            } else {
+                node_idx = node.exit;
+            }
+        }
+        return voxel_hit;
+    }
+
+
     // var last_chunk
     // while iter < 120u {
     while iter < 10u && voxel_hit.hit_data == 0u {
@@ -918,14 +973,21 @@ fn traverse_root_grid(
         grid_hit = root_grid_chunks[index];
 
         if grid_hit.w != 0 {
-            // voxel_hit.t = f32(dda.map.x * dda.map.z) * 0.2;
-            // voxel_hit.hit_data = u32(grid_hit.w);
 
             let t = intersect_aabb(
                 ray_in,
                 vec3<f32>(grid_hit.xyz),
                 vec3<f32>(grid_hit.xyz) + vec3<f32>(vec3(CHUNK_XMAX, CHUNK_YMAX, CHUNK_XMAX)),
             );
+
+            // if t > 0.0 {
+            //     // voxel_hit.t = t;
+            //     voxel_hit.t = f32(dda.map.x * dda.map.z) * 1.4;
+            //     voxel_hit.hit_data = u32(grid_hit.w);
+            // }
+            // if true {
+            //     continue;
+            // }
 
             // if t > 0.0 && t < last_t {
 
@@ -992,11 +1054,11 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
     if true {
         var final_color = vec3(0.0);
 
-        for (var i = 0; i < 12; i++) {
+        for (var i = 0; i < 8; i++) {
             var ray = ray_in;
 
-            ray.orig.x += f32(6 - i) * 0.01;
-            ray.orig.z += f32(6 - i) * 0.01;
+            ray.orig.x += f32(4 - i) * 0.01;
+            ray.orig.z += f32(4 - i) * 0.01;
 
             let hit = traverse_root_grid(ray);
 
@@ -1006,7 +1068,7 @@ fn raytrace(ray_in: Ray) -> vec3<f32> {
             }
         }
 
-        return final_color / 12.0;
+        return final_color / 8.0;
         // let hit = traverse_root_grid(ray_in);
 
         // if hit.hit_data != 0u {
@@ -1074,7 +1136,7 @@ fn main(
     var final_color = vec3<f32>(0.0, 0.0, 0.0);
     var seed: u32 = (u32(screen_pos.x) * (1973u) + u32(screen_pos.y) * (9277u) * (26699u)) | (1u);
 
-    let MAX_SAMPLES = 0;
+    let MAX_SAMPLES = 1;
 
     ray.dir = vec_rot_x(ray.dir, -0.85);
     // ray.dir = vec_rot_y(ray.dir, -1.9);
@@ -1105,5 +1167,5 @@ fn main(
 
     textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
     textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
-    textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
+    // textureStore(color_output, screen_pos, vec4(raytrace(ray).xyz, 1.0));
 }
