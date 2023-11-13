@@ -20,8 +20,9 @@ const CHUNK_X: usize = 64;
 const CHUNK_Y: usize = 64;
 const CHUNK_Z: usize = 64;
 pub const CHUNK_TSIZE: usize = CHUNK_X * CHUNK_Y * CHUNK_Z;
-pub const CHUNK_MEM_OFFSET: usize = 1000000; // 995326;
-const CHUNK_RADIUS: i32 = 6;
+pub const CHUNK_MEM_OFFSET: usize = CHUNK_TSIZE; // 995326;
+                                                 // pub const CHUNK_MEM_OFFSET: usize = 1000000; // 995326;
+const CHUNK_RADIUS: i32 = 8;
 
 pub struct VoxelGenerated {
     chunk_position: [i32; 3],
@@ -223,32 +224,32 @@ impl Chunk {
 
         println!("{:?}", position);
 
-        let mut voxels_gen: Vec<VoxelGenerated> = Vec::new();
+        // let mut voxels_gen: Vec<VoxelGenerated> = Vec::new();
 
-        voxels_gen.push(VoxelGenerated {
-            chunk_position: [
-                ((position[0]) * CHUNK_X as i32),
-                0,
-                ((position[2]) * CHUNK_Z as i32),
-            ],
-            // position: [pos[0] as u32, y as u32, pos[1] as u32],
-            position: [18, 40, 18],
-            voxel_type: 2,
-            node_index: 0,
-        });
+        // voxels_gen.push(VoxelGenerated {
+        //     chunk_position: [
+        //         ((position[0]) * CHUNK_X as i32),
+        //         0,
+        //         ((position[2]) * CHUNK_Z as i32),
+        //     ],
+        //     // position: [pos[0] as u32, y as u32, pos[1] as u32],
+        //     position: [18, 40, 18],
+        //     voxel_type: 2,
+        //     node_index: 0,
+        // });
 
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
-                voxels_gen.push(VoxelGenerated {
-                    chunk_position: [
-                        ((position[0]) * CHUNK_X as i32),
-                        0,
-                        ((position[2]) * CHUNK_Z as i32),
-                    ],
-                    position: [x as u32, 24, z as u32],
-                    voxel_type: 3,
-                    node_index: 0,
-                });
+                // voxels_gen.push(VoxelGenerated {
+                //     chunk_position: [
+                //         ((position[0]) * CHUNK_X as i32),
+                //         0,
+                //         ((position[2]) * CHUNK_Z as i32),
+                //     ],
+                //     position: [x as u32, 24, z as u32],
+                //     voxel_type: 3,
+                //     node_index: 0,
+                // });
                 let index = (z * CHUNK_X * CHUNK_Y) + (24 * CHUNK_X) + x;
                 self.chunks_mem[chunk_offset + index] = 3;
             }
@@ -282,21 +283,21 @@ impl Chunk {
                 // let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
                 // self.chunks_mem[chunk_offset + index] = 1;
 
-                for y in (y - 4..y).rev() {
-                    if y == 26 || y == 33 {
-                        continue;
-                    }
-                    voxels_gen.push(VoxelGenerated {
-                        chunk_position: [
-                            ((position[0]) * CHUNK_X as i32),
-                            0,
-                            ((position[2]) * CHUNK_Z as i32),
-                        ],
-                        // position: [pos[0] as u32, y as u32, pos[1] as u32],
-                        position: [x as u32, y as u32, z as u32],
-                        voxel_type: 1,
-                        node_index: 0,
-                    });
+                for y in (0..y).rev() {
+                    // if y == 26 || y == 33 {
+                    //     continue;
+                    // }
+                    // voxels_gen.push(VoxelGenerated {
+                    //     chunk_position: [
+                    //         ((position[0]) * CHUNK_X as i32),
+                    //         0,
+                    //         ((position[2]) * CHUNK_Z as i32),
+                    //     ],
+                    //     // position: [pos[0] as u32, y as u32, pos[1] as u32],
+                    //     position: [x as u32, y as u32, z as u32],
+                    //     voxel_type: 1,
+                    //     node_index: 0,
+                    // });
 
                     let index = (z * CHUNK_X * CHUNK_Y) + (y * CHUNK_X) + x;
                     self.chunks_mem[chunk_offset + index] = 1;
@@ -330,19 +331,19 @@ impl Chunk {
             chunk_offset as i32,
         ]);
 
-        let start_time = Instant::now();
-        let bvh_voxel = bvh::bvh::BVH::build(&mut voxels_gen);
+        // let start_time = Instant::now();
+        // let bvh_voxel = bvh::bvh::BVH::build(&mut voxels_gen);
 
-        let custom_constructor = |aabb: &AABB, entry, exit, shape_index: u32| {
-            let offset = if shape_index != 4294967295 {
-                voxels_gen[shape_index as usize].voxel_type
-            } else {
-                0
-            };
-            // println!("=> {} {}", entry, exit);
-            VoxelBvhNode::new(aabb, entry, exit, offset)
-        };
-        let bvh_voxel_flatten = bvh_voxel.flatten_custom(&custom_constructor);
+        // let custom_constructor = |aabb: &AABB, entry, exit, shape_index: u32| {
+        //     let offset = if shape_index != 4294967295 {
+        //         voxels_gen[shape_index as usize].voxel_type
+        //     } else {
+        //         0
+        //     };
+        //     // println!("=> {} {}", entry, exit);
+        //     VoxelBvhNode::new(aabb, entry, exit, offset)
+        // };
+        // let bvh_voxel_flatten = bvh_voxel.flatten_custom(&custom_constructor);
 
         // bvh_voxel.pretty_print();
         // for v in bvh_voxel_flatten {
@@ -350,27 +351,27 @@ impl Chunk {
         // }
 
         // exit(0);
-        println!(
-            "Offset: {} | Vox count : {} / {} - {} ms",
-            chunk_offset,
-            voxels_gen.len(),
-            bvh_voxel_flatten.len(),
-            start_time.elapsed().as_millis()
-        );
+        // println!(
+        //     "Offset: {} | Vox count : {} / {} - {} ms",
+        //     chunk_offset,
+        //     voxels_gen.len(),
+        //     bvh_voxel_flatten.len(),
+        //     start_time.elapsed().as_millis()
+        // );
 
-        self.bvh_generated_chunks.push(ChunkGenerated {
-            position: [
-                (position[0] * CHUNK_X as i32) as f32,
-                (position[1] * CHUNK_Y as i32) as f32,
-                (position[2] * CHUNK_Z as i32) as f32,
-            ],
-            offset: (chunk_offset as u32),
-            node_index: 0,
-        });
+        // self.bvh_generated_chunks.push(ChunkGenerated {
+        //     position: [
+        //         (position[0] * CHUNK_X as i32) as f32,
+        //         (position[1] * CHUNK_Y as i32) as f32,
+        //         (position[2] * CHUNK_Z as i32) as f32,
+        //     ],
+        //     offset: (chunk_offset as u32),
+        //     node_index: 0,
+        // });
 
-        for (index, voxel) in bvh_voxel_flatten.iter().enumerate() {
-            self.bvh_chunk_voxels[chunk_offset + index] = voxel.clone();
-        }
+        // for (index, voxel) in bvh_voxel_flatten.iter().enumerate() {
+        //     self.bvh_chunk_voxels[chunk_offset + index] = voxel.clone();
+        // }
 
         // self.bvh_chunk_voxels.cop
         // self.generated_chunks_voxs
@@ -413,19 +414,19 @@ impl Chunk {
             );
         }
 
-        let bvh_chunk = bvh::bvh::BVH::build(&mut self.bvh_generated_chunks);
+        // let bvh_chunk = bvh::bvh::BVH::build(&mut self.bvh_generated_chunks);
 
-        let custom_constructor = |aabb: &AABB, entry, exit, shape_index| {
-            let offset = if shape_index != 4294967295 {
-                self.bvh_generated_chunks[shape_index as usize].offset
-            } else {
-                0
-            };
+        // let custom_constructor = |aabb: &AABB, entry, exit, shape_index| {
+        //     let offset = if shape_index != 4294967295 {
+        //         self.bvh_generated_chunks[shape_index as usize].offset
+        //     } else {
+        //         0
+        //     };
 
-            GpuBvhNode::new(aabb, entry, exit, offset)
-        };
+        //     GpuBvhNode::new(aabb, entry, exit, offset)
+        // };
 
-        self.bvh_chunks = bvh_chunk.flatten_custom(&custom_constructor);
+        // self.bvh_chunks = bvh_chunk.flatten_custom(&custom_constructor);
 
         // for (index, node) in self.bvh_chunk_voxels.iter().enumerate() {
         //     if index > 16 {

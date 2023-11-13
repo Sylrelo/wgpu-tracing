@@ -38,10 +38,10 @@ pub struct TracingPipelineBuffers {
     pub root_grid: Buffer,
     // pub test_bvh_buffer: Buffer,
     // pub test_uniform_grid_chunks: Buffer,
-    pub bvh_chunks: Buffer,
-    pub bvh_chunk_voxels: Buffer,
+    // pub bvh_chunks: Buffer,
+    // pub bvh_chunk_voxels: Buffer,
 
-    pub root_chunks: Buffer,
+    // pub root_chunks: Buffer,
 }
 
 pub struct TracingPipelineTest {
@@ -100,30 +100,30 @@ impl TracingPipelineTest {
 
     // ===============================
 
-    pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
-        queue.write_buffer(
-            &self.buffers.root_chunks,
-            0,
-            bytemuck::cast_slice(chunks.as_slice()),
-        );
-    }
+    // pub fn buffer_root_chunk_update(&self, queue: &Queue, chunks: &Vec<[i32; 4]>) {
+    //     queue.write_buffer(
+    //         &self.buffers.root_chunks,
+    //         0,
+    //         bytemuck::cast_slice(chunks.as_slice()),
+    //     );
+    // }
 
-    pub fn buffer_bvh_chunks_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
-        queue.write_buffer(
-            &self.buffers.bvh_chunks,
-            0,
-            bytemuck::cast_slice(nodes.as_slice()),
-        );
-    }
+    // pub fn buffer_bvh_chunks_update(&self, queue: &Queue, nodes: &Vec<GpuBvhNode>) {
+    //     queue.write_buffer(
+    //         &self.buffers.bvh_chunks,
+    //         0,
+    //         bytemuck::cast_slice(nodes.as_slice()),
+    //     );
+    // }
 
-    pub fn buffer_bvh_chunk_voxels_update(&self, queue: &Queue, nodes: &Vec<VoxelBvhNode>) {
-        println!("Uploading {}", nodes.len());
-        queue.write_buffer(
-            &self.buffers.bvh_chunk_voxels,
-            0,
-            bytemuck::cast_slice(nodes.as_slice()),
-        );
-    }
+    // pub fn buffer_bvh_chunk_voxels_update(&self, queue: &Queue, nodes: &Vec<VoxelBvhNode>) {
+    //     println!("Uploading {}", nodes.len());
+    //     queue.write_buffer(
+    //         &self.buffers.bvh_chunk_voxels,
+    //         0,
+    //         bytemuck::cast_slice(nodes.as_slice()),
+    //     );
+    // }
 
     pub fn buffer_chunk_content_update(&self, queue: &Queue, content: &Vec<u32>) {
         queue.write_buffer(
@@ -218,12 +218,12 @@ impl TracingPipelineTest {
             .done()
             // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.test_bvh_buffer, true)
             // .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunks, true)
-            .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunk_voxels, true)
-            .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_chunks, true)
-            .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunks, true)
+            // .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.bvh_chunk_voxels, true)
+            // .done()
+            // .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_chunks, true)
+            // .done()
             .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
             .done()
             // .with_default_buffer_storage(
@@ -250,12 +250,12 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
-        let root_chunks = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : Chunks Buffer"),
-            mapped_at_creation: false,
-            size: 499 * 16,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        // let root_chunks = device.create_buffer(&BufferDescriptor {
+        //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
+        //     mapped_at_creation: false,
+        //     size: 499 * 16,
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
         let root_grid = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : ROOT GRID"),
@@ -264,21 +264,21 @@ impl TracingPipelineTest {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
-        let bvh_chunks = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : Chunks Buffer"),
-            mapped_at_creation: false,
-            size: 40000,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        // let bvh_chunks = device.create_buffer(&BufferDescriptor {
+        //     label: Label::from("Tracing Pipeline : Chunks Buffer"),
+        //     mapped_at_creation: false,
+        //     size: 40000,
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
-        let bvh_chunk_voxels = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : bvh_chunk_voxels Buffer"),
-            mapped_at_creation: false,
-            size: 2147483640,
+        // let bvh_chunk_voxels = device.create_buffer(&BufferDescriptor {
+        //     label: Label::from("Tracing Pipeline : bvh_chunk_voxels Buffer"),
+        //     mapped_at_creation: false,
+        //     size: 2147483640,
 
-            // 3072000000 / (1000000 * 48) = 64
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
+        //     // 3072000000 / (1000000 * 48) = 64
+        //     usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        // });
 
         TracingPipelineBuffers {
             chunk_content,
@@ -288,9 +288,9 @@ impl TracingPipelineTest {
             uniform,
 
             root_grid,
-            bvh_chunks,
-            bvh_chunk_voxels,
-            root_chunks,
+            // bvh_chunks,
+            // bvh_chunk_voxels,
+            // root_chunks,
         }
     }
 }
