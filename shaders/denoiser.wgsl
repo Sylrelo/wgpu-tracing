@@ -54,7 +54,7 @@ fn main(
 
     let step = vec2(1. / 1280., 1. / 720.); // resolution
 
-    var denoiser_setting = DenoiseSettings(0.5, 0.05, 0.5, 4.0);
+    var denoiser_setting = DenoiseSettings(1.0, 0.5, 0.5, 4.0);
     var final_color = vec3(0.0);
 
     var cval = textureLoad(color_map, screen_pos, 0).rgb;
@@ -68,9 +68,9 @@ fn main(
         var sum = vec3(0.0);
         // let cval = textureLoad(color_map, screen_pos, 0).rgb;
         let nval = textureLoad(normal_map, screen_pos, 0).xyz;
-        let dval = textureLoad(depth_map, screen_pos, 0).x;
+        let dval = textureLoad(depth_map, screen_pos, 0).xyz;
 
-        let sf2 = pow(2.0, f32(e));
+        let sf2 = pow(1.5, f32(e));
 
         for (var i = 0; i < KERNEL_SIZE; i++) {
             let uv = screen_pos + vec2<i32>(OFFSETS[i]) * i32(sf2);
@@ -79,7 +79,7 @@ fn main(
 
             let ctmp = textureLoad(color_map, uv, 0).rgb;
             let ntmp = textureLoad(normal_map, uv, 0).xyz;
-            let dtmp = textureLoad(depth_map, uv, 0).x;
+            let dtmp = textureLoad(depth_map, uv, 0).xyz;
 
             var color_diff = cval.rgb - ctmp.rgb;
             let c_w = min(exp(-dot(color_diff, color_diff)) / denoiser_setting.c_phi, 1.0);
@@ -92,10 +92,10 @@ fn main(
 
 
             let pt = abs(dval - dtmp);
-            let p_w = max(min(1.0 - pt / denoiser_setting.p_phi, 1.0), 0.0);
+            let p_w = max(min(1.0 - dot(pt, pt) / denoiser_setting.p_phi, 1.0), 0.0);
 
             // let weight = c_w * KERNEL[i];
-            let weight = c_w * n_w * p_w * KERNEL[i];
+            let weight = p_w * c_w * n_w * KERNEL[i];
 
             sum += ctmp.rgb * weight;
             cum_w += weight;

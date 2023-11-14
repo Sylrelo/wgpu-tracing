@@ -147,13 +147,13 @@ impl TracingPipelineTest {
 
     fn create_textures_bind_groups(device: &Device, textures: &RenderTexture) -> BindGroups {
         BindingGeneratorBuilder::new(device)
-            .with_storage_texture(
-                &textures.render_view,
-                TextureFormat::Rgba8Unorm,
-                StorageTextureAccess::WriteOnly,
-            )
-            .visibility(ShaderStages::COMPUTE)
-            .done()
+            // .with_storage_texture(
+            //     &textures.render_view,
+            //     TextureFormat::Rgba8Unorm,
+            //     StorageTextureAccess::WriteOnly,
+            // )
+            // .visibility(ShaderStages::COMPUTE)
+            // .done()
             .with_storage_texture(
                 &textures.normal_view,
                 TextureFormat::Rgba8Snorm,
@@ -170,11 +170,21 @@ impl TracingPipelineTest {
             .done()
             .with_storage_texture(
                 &textures.depth_view,
-                TextureFormat::Rgba8Unorm,
+                TextureFormat::Rgba32Float,
+                StorageTextureAccess::ReadWrite,
+            )
+            .visibility(ShaderStages::COMPUTE)
+            .done()
+            .with_storage_texture(
+                &textures.velocity_view,
+                TextureFormat::Rgba32Float,
                 StorageTextureAccess::WriteOnly,
             )
             .visibility(ShaderStages::COMPUTE)
             .done()
+            // .with_texture_only(ShaderStages::COMPUTE, &textures.velocity_view)
+            // .visibility(ShaderStages::COMPUTE)
+            // .done()
             .build()
     }
 

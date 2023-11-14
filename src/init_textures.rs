@@ -18,6 +18,9 @@ pub struct RenderTexture {
 
     pub depth: Texture,
     pub depth_view: TextureView,
+
+    pub velocity: Texture,
+    pub velocity_view: TextureView,
 }
 
 impl RenderTexture {
@@ -39,9 +42,16 @@ impl RenderTexture {
         });
 
         let depth =
-            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba32Float);
         let depth_view = depth.create_view(&TextureViewDescriptor {
-            format: Some(TextureFormat::Rgba8Unorm),
+            format: Some(TextureFormat::Rgba32Float),
+            ..TextureViewDescriptor::default()
+        });
+
+        let velocity =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba32Float);
+        let velocity_view = velocity.create_view(&TextureViewDescriptor {
+            format: Some(TextureFormat::Rgba32Float),
             ..TextureViewDescriptor::default()
         });
 
@@ -58,6 +68,9 @@ impl RenderTexture {
 
             depth,
             depth_view,
+
+            velocity,
+            velocity_view,
         }
     }
 

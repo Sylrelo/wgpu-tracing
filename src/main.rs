@@ -121,7 +121,7 @@ fn tmp_exec_render(
             resolve_target: None,
 
             ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                 store: true,
                 // store: wgpu::StoreOp::Store,
             },
@@ -198,6 +198,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let render_texture_depth_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.depth_view)
+        .done()
+        .build();
+
+    let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_only(ShaderStages::FRAGMENT, &textures.velocity_view)
         .done()
         .build();
 
@@ -398,7 +403,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     }
                     VirtualKeyCode::T => {
                         tmp_displayed_texture += 1;
-                        tmp_displayed_texture = if tmp_displayed_texture > 3 {
+                        tmp_displayed_texture = if tmp_displayed_texture > 4 {
                             0
                         } else {
                             tmp_displayed_texture
@@ -478,6 +483,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     1 => &render_texture_color_debug_bindgroups.bind_group,
                     2 => &render_texture_normal_debug_bindgroups.bind_group,
                     3 => &render_texture_depth_debug_bindgroups.bind_group,
+                    4 => &render_texture_velocity_debug_bindgroups.bind_group,
                     _ => &render_texture_bindgroups.bind_group,
                 };
 

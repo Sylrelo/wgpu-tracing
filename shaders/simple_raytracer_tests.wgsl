@@ -34,17 +34,20 @@ var<storage> chunk_content: array<u32>;
 @group(1) @binding(1)
 var<storage> root_grid_chunks: array<vec4<i32>>;
 
-@group(2) @binding(0)
-var color_output: texture_storage_2d<rgba8unorm, write>;
+// @group(2) @binding(0)
+// var color_output: texture_storage_2d<rgba8unorm, write>;
 
-@group(2) @binding(1)
+@group(2) @binding(0)
 var normal_output: texture_storage_2d<rgba8snorm, write>;
 
+@group(2) @binding(1)
+var color_output: texture_storage_2d<rgba8unorm, write>;
+
 @group(2) @binding(2)
-var color_output2: texture_storage_2d<rgba8unorm, write>;
+var depth_output: texture_storage_2d<rgba32float, read_write>;
 
 @group(2) @binding(3)
-var depth_output: texture_storage_2d<rgba8unorm, write>;
+var velocity_texture: texture_storage_2d<rgba32float, write>;
 
 // CONSTANTS =================================================
 
@@ -452,8 +455,8 @@ fn sample_sunlight(seed: ptr<function, u32>, hit_point: vec3<f32>, hit_normal: v
     let theta = asin(150.0 / dst);
 
     var shadow_ray: Ray;
-    shadow_ray.dir = light_dir;//sample_cone(seed, light_dir, theta);
-    shadow_ray.orig = hit_point + hit_normal * 0.001;
+    shadow_ray.dir = sample_cone(seed, light_dir, theta * 0.5);
+    shadow_ray.orig = hit_point + hit_normal * 0.0001;
     precalc_ray(&shadow_ray);
 
     let inv_prob = 2.0 * (1.0 - cos(theta)) * 50.0;
@@ -463,7 +466,7 @@ fn sample_sunlight(seed: ptr<function, u32>, hit_point: vec3<f32>, hit_normal: v
     let shadow_hit = traverse_root_grid(shadow_ray);
 
     if shadow_hit.hit_data == 0u {
-        return vec3(1.0) * light_val ;//* inv_prob;
+        return vec3(1.0) * light_val * inv_prob;
     }
 
     return vec3(0.0);
@@ -494,6 +497,9 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
     var specular_bounce = true;
     var color: vec3<f32> = vec3(0.0, 0.0, 0.0);
 
+    var is_prev_reflection = false;
+    let prev_position = textureLoad(depth_output, screen_pos);
+
     for (var i = 0; i < 3; i++) {
         // var voxel_hit = bvh_traverse_chunks(ray);
         let voxel_hit = traverse_root_grid(ray);
@@ -507,9 +513,17 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         // let normal = get_normal(voxel_hit.side, voxel_hit.step_amount);
         let normal = vec3<f32>(voxel_hit.mask) * -sign(vec3<f32>(voxel_hit.step_amount));
 
-        if i == 0 {
+        if i == 0 || (is_prev_reflection && i == 1) {
             textureStore(normal_output, screen_pos, normal.xyzz);
-            textureStore(depth_output, screen_pos, vec4(vec3(voxel_hit.t / 500.0), 1.0));
+
+
+
+
+            let current_position = vec4((point * 0.001), 1.0);
+            textureStore(depth_output, screen_pos, current_position);
+
+            textureStore(velocity_texture, screen_pos, vec4((current_position.xyz - prev_position.xyz) * 2.0, 1.0));
+            // textureStore(depth_output, screen_pos, vec4(vec3(voxel_hit.t / 500.0), 1.0));
         }
 
         var vox_color = normal * 0.5 + 0.5;
@@ -519,7 +533,8 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         // }
         // throughput *= vox_color;
 
-        vox_color = vec3(0.1, 0.3, 0.6);
+        vox_color = vec3(0.6, 0.3, 0.6);
+        // vox_color = vec3(1.0);
 
         ray.orig = point + normal * 0.0001;
 
@@ -547,7 +562,8 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         // }
 
         if voxel_hit.hit_data == 3u {
-            // color += throughput * vec3(0.0, 1.0, 1.0) * 0.1;
+            is_prev_reflection = true;
+            color += throughput * vec3(0.0, 0.5, 1.0) * 0.05;
         //     ray.dir = normalize(reflect(ray.dir, voxel_hit.normal) + getCosineWeightedSample(seed, voxel_hit.normal) * 0.02);
         }
 
@@ -629,6 +645,9 @@ fn main(
     // ray.dir = vec_rot_y(ray.dir, -1.9);
     precalc_ray(&ray);
 
+    // textureStore(normal_output, screen_pos, vec4(0.0));
+    // textureStore(depth_output, screen_pos, vec4(0.0));
+
     for (var i = 0; i < MAX_SAMPLES; i++) {
         // seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
         seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
@@ -651,6 +670,6 @@ fn main(
     tone_mapping = pow(tone_mapping, vec3(1.0 / exposure));
 
     textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
-    textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
+    // textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
     // textureStore(color_output, screen_pos, vec4(raytrace(ray, ndc_pixel).xyz, 1.0));
 }
