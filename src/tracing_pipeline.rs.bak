@@ -11,7 +11,7 @@ use wgpu::{
 };
 
 use crate::init_textures::RenderTexture;
-use crate::structs::{Camera, Voxel, VoxelWorldTest, INTERNAL_H, INTERNAL_W};
+use crate::structs::{Camera, INTERNAL_H, INTERNAL_W};
 use crate::utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder};
 
 pub struct TracingPipeline {
@@ -24,9 +24,6 @@ pub struct TracingPipeline {
     pub uniform_buffer: Buffer,
 
     pub grid_buffer: Buffer,
-    pub test_voxels_array_dda: Vec<VoxelWorldTest>, // pub triangles_buffer: Buffer,
-
-                                                    // pub voxels_buffer: Buffer,
 }
 
 impl TracingPipeline {
@@ -76,8 +73,6 @@ impl TracingPipeline {
             storage_binds,
             uniform_buffer: camera_uniform_buffer,
             grid_buffer: dda_buffer,
-            test_voxels_array_dda: test_voxels_array_dda, // triangles_buffer,
-                                                          // voxels_buffer,
         }
     }
 
@@ -183,8 +178,6 @@ impl TracingPipeline {
         //         p2: [-0.5, -1.0, 0.0, 0.0],
         //     },
         // ];
-
-        let _test_voxels_list: Vec<Voxel> = Vec::new();
 
         let capa = 386 * 256 * 386;
 

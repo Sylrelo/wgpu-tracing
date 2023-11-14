@@ -9,9 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread, time};
 
-use bvh::aabb::Bounded;
-use bvh::bounding_hierarchy::BHShape;
-use bvh::Point3;
 use denoiser_pipeline::DenoiserPipeline;
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
@@ -27,7 +24,7 @@ use winit::{
 };
 
 use log::{error, info};
-use structs::{App, SwapchainData, Voxel};
+use structs::{App, SwapchainData};
 
 use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
@@ -42,7 +39,6 @@ mod init_render_pipeline;
 mod init_textures;
 mod init_wgpu;
 mod structs;
-mod tracing_pipeline;
 mod tracing_pipeline_new;
 mod utils;
 
@@ -262,6 +258,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // let mut last_shader_update: u64 = 0;
 
     chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
+    let mut already_uploaded_tmp = false;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -302,42 +299,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 }
 
                 println!("{:?}", camera.position);
-
-                // app.queue.write_buffer(
-                //     &tracing_pipeline.uniform_buffer,
-                //     0,
-                //     bytemuck::cast_slice(&[camera]),
-                // );
-
-                // let test = fs::metadata("E:\\Dev\\test-ray\\shaders\\simple_raytracer_tests.wgsl")
-                //     .unwrap()
-                //     .modified()
-                //     .unwrap()
-                //     .duration_since(UNIX_EPOCH)
-                //     .unwrap()
-                //     .as_secs();
-
-                // if last_shader_update == 0 {
-                //     last_shader_update = test;
-                // }
-                // if test > last_shader_update {
-                //     last_shader_update = test;
-
-                //     let shader_module = compile_shader(
-                //         &app.device,
-                //         &"E:\\Dev\\test-ray\\shaders\\simple_raytracer_tests.wgsl".to_string(),
-                //     );
-                //     if shader_module.is_some() {
-                //         println!("Recreate");
-                //         tracing_pipeline_new.recreate_pipeline(&app.device, shader_module.unwrap());
-                //     }
-                // }
-
-                // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
-                // tracing_pipeline_new
-                //     .chunk_grid_buffer_update(&app.queue, &chunks.chunks_uniform_grod);
-
-                // println!("{} Hello mofo", input.scancode);
             }
 
             Event::WindowEvent {
@@ -349,16 +310,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 app.config.height = new_size.height;
                 app.surface.configure(&app.device, &app.config);
 
-                tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
-                tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
+                if already_uploaded_tmp == false {
+                    tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
+                    tracing_pipeline_new
+                        .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
 
-                // tracing_pipeline_new.buffer_bvh_chunks_update(&app.queue, &chunks.bvh_chunks);
-                // tracing_pipeline_new
-                // .buffer_bvh_chunk_voxels_update(&app.queue, &chunks.bvh_chunk_voxels);
+                    already_uploaded_tmp = true
+                }
 
-                // tracing_pipeline_new.buffer_root_chunk_update(&app.queue, &chunks.root_chunks);
-                // tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
-                // tracing_pipeline_new.buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
                 app.window.request_redraw();
             }
 
@@ -370,25 +329,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-                    // tracing_pipeline_new
-                    //     .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
-
-                    // println!("Camera {:?}", camera.position);
-
-                    // tracing_pipeline_new.uniform_settings_update(
-                    //     &app.queue,
-                    //     TracingPipelineSettings{
-                    //        chunk_count: chunks.generated_chunks_gpu.len() as u32,
-                    //        player_position: camera.position,
-                    //        _padding: 0,
-                    // });
-
-                    // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
-
-                    // app.queue.submit();
-
-                    app.window
-                        .set_title(format!("{:3} FPS - {:3} ms", fps, fps / 1000).as_str());
+                    app.window.set_title(
+                        format!("{:3} FPS - {:3} ms", fps, 1000.0 / fps as f32).as_str(),
+                    );
                     fps = 0;
                     last_time = curr;
                 }
@@ -409,29 +352,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     &app.queue,
                     TracingPipelineSettings {
                         chunk_count: chunks.chunks_mem.len() as u32,
-                        // chunk_count: chunks.generated_chunks_gpu.len() as u32,
                         player_position: camera.position,
-                        // _padding: 0,
-                        _padding: chunks.bvh_chunks.len() as u32,
+                        _padding: 0,
                     },
                 );
-
-                // let mut caca = app
-                //     .queue
-                //     .write_buffer_with(
-                //         &tracing_pipeline.grid_buffer,
-                //         0,
-                //         NonZeroU64::new(400).unwrap(),
-                //     )
-                //     .unwrap();
-
-                // caca.sort();
-
-                // app.queue.write_buffer(
-                //     &tracing_pipeline.grid_buffer,
-                //     0,
-                //     bytemuck::cast_slice(tracing_pipeline.test_voxels_array_dda.as_slice()),
-                // );
 
                 let mut encoder = app
                     .device
@@ -463,8 +387,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.draw(0..3, 0..1);
                 }
 
-                // tracing_pipeline_new.chunks_buffer_update(&app.queue, &chunks.generated_chunks_gpu);
-
                 app.queue.submit(Some(encoder.finish()));
 
                 frame.present();
@@ -479,187 +401,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 }
 
-impl Bounded for Voxel {
-    fn aabb(&self) -> bvh::aabb::AABB {
-        bvh::aabb::AABB::with_bounds(
-            Point3::new(0.0 - self.pos[0], 0.0 - self.pos[1], 0.0 - self.pos[2]),
-            Point3::new(1.0 - self.pos[0], 1.0 - self.pos[1], 1.0 - self.pos[2]),
-        )
-    }
-}
-
-impl BHShape for Voxel {
-    fn set_bh_node_index(&mut self, index: usize) {
-        self.node_index = index;
-    }
-    fn bh_node_index(&self) -> usize {
-        self.node_index
-    }
-}
-
-// impl Bounded<f32, 3> for Voxel {
-//     fn aabb(&self) -> Aabb<f32, 3> {
-//         // let half_size = SVector::<f32, 3>::new(self.radius, self.radius, self.radius);
-//         // let min = self.position - half_size;
-//         // let max = self.position + half_size;
-//         Aabb::with_bounds(min, max)
-//     }
-// }
-
 fn main() {
     env_logger::init();
 
     println!("Internal resolution : {} x {}", INTERNAL_W, INTERNAL_H);
-
-    // Max node_index for 36x256x36 chunk size : 995326
-    // Max: 1048575 | << 12 | 0xfffff
-
-    // theorical max different chunk : 511
-    // 511 | << 9 | 0x1ff
-
-    // let test = 1048575 << 12 | 1 << 11; // node entry | ??
-    // let test2 = 1048575 << 12; // node exit | ??
-
-    // //         331776
-    // let test3 = 524287 << 13 | 511 << 4; // voxel position relative to chunk | voxel type
-
-    // println!("{:b}", test);
-    // println!("{:b}", test2);
-    // println!("{:b}", test3);
-
-    // exit(0);
-    // 19
-    // 6 + 6 + 8
-
-    // 11111111111111111110000000000000
-    // 11111111111111111111000000000000
-
-    // let mut chunks = Chunk::init();
-
-    // chunks.new([0, 0, 0, 0]);
-
-    // chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
-
-    // chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
-
-    // exit(1);
-
-    // let input_img: Vec<f32> = Vec::new();
-    // let mut filter_output = vec![0.0f32; input_img.len()];
-
-    // unsafe {
-    //     let allo = oidn2_sys::oidnGetNumPhysicalDevices();
-
-    //     println!("{}", allo);
-
-    //     let device = oidn2_sys::oidnNewDevice(oidn2_sys::OIDNDeviceType_OIDN_DEVICE_TYPE_DEFAULT);
-    //     oidn2_sys::oidnCommitDevice(device);
-
-    //     let color_buffer = oidn2_sys::oidnNewBuffer(device, 500 * 500 * 3 * 4);
-    //     let output_buffer = oidn2_sys::oidnNewBuffer(device, 500 * 500 * 3 * 4);
-
-    //     let filter = oidn2_sys::oidnNewFilter(device, CString::new("RT").unwrap().into_raw());
-
-    //     // oidn2_sys::OIDNQuality_OIDN_QUALITY_BALANCED
-    //     // oidn2_sys::oidnSetFilterInt(filter, name, value)
-
-    //     oidn2_sys::oidnSetFilterImage(
-    //         filter,
-    //         CString::new("color").unwrap().into_raw(),
-    //         color_buffer,
-    //         oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
-    //         500,
-    //         500,
-    //         0,
-    //         0,
-    //         0,
-    //     );
-    //     oidn2_sys::oidnSetFilterImage(
-    //         filter,
-    //         CString::new("output").unwrap().into_raw(),
-    //         output_buffer,
-    //         oidn2_sys::OIDNFormat_OIDN_FORMAT_FLOAT3,
-    //         500,
-    //         500,
-    //         0,
-    //         0,
-    //         0,
-    //     );
-    //     oidn2_sys::oidnSetFilterInt(filter, CString::new("quality").unwrap().into_raw(), 0);
-
-    //     oidn2_sys::oidnCommitFilter(filter);
-
-    //     let pute = oidn2_sys::oidnGetBufferData(color_buffer);
-    //     let slice = std::slice::from_raw_parts_mut(pute as *mut f32, 500 * 500 * 3 * 4);
-
-    //     let diffuse_bytes = include_bytes!("tracing.png");
-    //     let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
-
-    //     let mut i = 0;
-
-    //     for img in diffuse_image.pixels() {
-    //         // println!("{} {} {:?} ", img.0, img.1, img.2);
-
-    //         slice[i] = img.2 .0[0] as f32 / 255.0;
-    //         slice[i + 1] = img.2 .0[1] as f32 / 255.0;
-    //         slice[i + 2] = img.2 .0[2] as f32 / 255.0;
-
-    //         i += 3;
-    //     }
-
-    //     println!("{:?} {:?}", pute, color_buffer);
-    //     oidn2_sys::oidnReleaseBuffer(color_buffer);
-
-    //     // let img2 = image::ImageReader::new(Cursor::new(slice))
-    //     //     .with_guessed_format()?
-    //     //     .decode()?;
-
-    //     // img2.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)?;
-
-    //     let start = Instant::now();
-    //     oidn2_sys::oidnExecuteFilter(filter);
-    //     println!("Denoising time : {} ms", start.elapsed().as_millis());
-
-    //     let output_buffer_data = oidn2_sys::oidnGetBufferData(output_buffer);
-    //     let output_buffer_ptr =
-    //         std::slice::from_raw_parts(output_buffer_data as *mut f32, 500 * 500 * 3 * 4);
-
-    //     // let mut imgbuf: RgbImage = image::ImageBuffer::new(500, 500);
-
-    //     let mut img_buff: RgbImage = ImageBuffer::new(500, 500);
-
-    //     // let mut img = ImageBuffer::from_fn(512, 512, |x, y| image::Rgb([1.0, 1.0, 1.0]));
-
-    //     for (x, y, pixel) in img_buff.enumerate_pixels_mut() {
-    //         *pixel = image::Rgb([
-    //             (output_buffer_ptr[(y * 500 + x) as usize * 3] * 255.0) as u8,
-    //             (output_buffer_ptr[(y * 500 + x) as usize * 3 + 1] * 255.0) as u8,
-    //             (output_buffer_ptr[(y * 500 + x) as usize * 3 + 2] * 255.0) as u8,
-    //         ]);
-    //     }
-
-    //     img_buff.save("patate.jpg");
-
-    //     oidn2_sys::oidnReleaseBuffer(output_buffer);
-
-    //     let mut caca = CString::new("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
-    //     oidn2_sys::oidnGetDeviceError(device, &mut caca.as_ptr());
-    //     println!("=> {:?}", caca.as_bytes());
-    // }
-
-    // exit(1);
-
-    // let device = oidn::Device::new();
-    // oidn::RayTracing::new(&device)
-    //     // Optionally add float3 normal and albedo buffers as well.
-    //     .srgb(true)
-    //     .image_dimensions(1280 as usize, 720 as usize)
-    //     .filter(&input_img[..], &mut filter_output[..])
-    //     .expect("Filter config error!");
-
-    // if let Err(e) = device.get_error() {
-    //     println!("Error denosing image: {}", e.1);
-    // }
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
