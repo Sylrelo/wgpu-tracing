@@ -3,7 +3,7 @@
 struct Settings {
     position: vec4<f32>,
     chunk_content_count: u32,
-    root_chunk_count: u32,
+    frame_random_number: u32,
 }
 
 struct Ray {
@@ -41,7 +41,7 @@ var<storage> root_grid_chunks: array<vec4<i32>>;
 var normal_output: texture_storage_2d<rgba8snorm, write>;
 
 @group(2) @binding(1)
-var color_output: texture_storage_2d<rgba8unorm, write>;
+var color_output: texture_storage_2d<rgba8unorm, read_write>;
 
 @group(2) @binding(2)
 var depth_output: texture_storage_2d<rgba32float, read_write>;
@@ -647,21 +647,25 @@ fn main(
 
     // textureStore(normal_output, screen_pos, vec4(0.0));
     // textureStore(depth_output, screen_pos, vec4(0.0));
+    
+    // var last_blend = prev_color.a;
+    // if last_blend == 0.0 {
+    //     last_blend = 1.0;
+    // }
 
-    for (var i = 0; i < MAX_SAMPLES; i++) {
-        // seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
-        seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
+    let blending = f32((settings.frame_random_number) & 65535u) / 65535.0;
+
+    seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
 
         // let foc_target = ray.orig + ray.dir * 2.3;
-        // let defocus = 0.05 * rand2_in_circle(&seed);
+        // let defocus = 0.12 * rand2_in_circle(&seed);
 
         // ray.orig += vec3(defocus.xy, 0.0);
         // ray.dir = normalize(foc_target - ray.orig);
         // precalc_ray(&ray);
 
-        final_color += pathtrace(ray, &seed, screen_pos);
-    }
-    final_color = (final_color / f32(MAX_SAMPLES));
+    final_color = pathtrace(ray, &seed, screen_pos);
+    // }
 
     let gamma = 1.6;
     let exposure = 1.0;
@@ -669,7 +673,14 @@ fn main(
     var tone_mapping = vec3(1.0) - exp(-final_color * gamma);
     tone_mapping = pow(tone_mapping, vec3(1.0 / exposure));
 
-    textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
+
+
+    
+    // prev_color = (prev_color.xyz * samples + tone_mapping) / samples ;
+    var prev_color = textureLoad(color_output, screen_pos);
+    prev_color = mix(prev_color.xyzz, tone_mapping.xyzz, blending);
+
+    textureStore(color_output, screen_pos, vec4(prev_color.xyz, 1.0));
     // textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
     // textureStore(color_output, screen_pos, vec4(raytrace(ray, ndc_pixel).xyz, 1.0));
 }

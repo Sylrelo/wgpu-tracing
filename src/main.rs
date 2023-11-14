@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 
@@ -12,6 +13,7 @@ use std::{thread, time};
 use denoiser_pipeline::DenoiserPipeline;
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
+use rand::Rng;
 use tracing_pipeline_new::TracingPipelineTest;
 use wgpu::{Device, Label, ShaderModule, ShaderStages};
 use winit::dpi::{PhysicalSize, Size};
@@ -61,6 +63,36 @@ impl App {
     }
 }
 
+fn handle_keypressed(pressed_keys: &HashSet<VirtualKeyCode>, camera: &mut Camera) {
+
+    let fast_modifier = if pressed_keys.contains(&VirtualKeyCode::LShift) {
+        3.0
+    } else if pressed_keys.contains(&VirtualKeyCode::LAlt) {
+        5.0
+    } else {
+        1.0
+    };
+
+    if pressed_keys.contains(&VirtualKeyCode::W) {
+        camera.position[2] -= 0.25 * fast_modifier;
+    }
+    if pressed_keys.contains(&VirtualKeyCode::S) {
+        camera.position[2] += 0.25 * fast_modifier;
+    }
+    if pressed_keys.contains(&VirtualKeyCode::A) {
+        camera.position[0] -= 0.25 * fast_modifier;
+    }
+    if pressed_keys.contains(&VirtualKeyCode::D) {
+        camera.position[0] += 0.25 * fast_modifier;
+    }
+    if pressed_keys.contains(&VirtualKeyCode::R) {
+        camera.position[1] += 0.25 * fast_modifier;
+    }
+    if pressed_keys.contains(&VirtualKeyCode::F) {
+        camera.position[1] -= 0.25 * fast_modifier;
+    }
+}
+
 fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule> {
     let file = File::open(shader_path);
     let mut buff: String = String::new();
@@ -88,21 +120,6 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
         error!(target: "compile_shader", "{}", shader.err().unwrap());
         None
     };
-}
-
-fn tmp_update_render_uniform(
-    queue: &wgpu::Queue,
-    buffer: &wgpu::Buffer,
-    offset_x: f32,
-    offset_y: f32,
-) {
-    queue.write_buffer(
-        buffer,
-        0,
-        bytemuck::cast_slice(&[RenderUniform {
-            position_offset: [offset_x, offset_y, 0.0, 0.0],
-        }]),
-    );
 }
 
 fn tmp_exec_render(
@@ -141,6 +158,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         // position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
+    let mut pressed_keys: HashSet<VirtualKeyCode> = HashSet::new();
 
     // TEX TEST
     // let diffuse_bytes = include_bytes!("teddy.jpg");
@@ -365,6 +383,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
     let mut already_uploaded_tmp = false;
     let mut tmp_displayed_texture = 1;
+    let mut rng = rand::thread_rng();
+    let mut tmp_sample_count: f32 = 1.0;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -378,41 +398,30 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
             } => {
-                if input.state != ElementState::Pressed {
+                let current_key = input.virtual_keycode.unwrap();
+
+                tmp_sample_count = 1.0;
+                if input.state == ElementState::Pressed {
+                    pressed_keys.insert(current_key);
+                    match current_key {
+                        VirtualKeyCode::T => {
+                            tmp_displayed_texture += 1;
+                            tmp_displayed_texture = if tmp_displayed_texture > 4 {
+                                0
+                            } else {
+                                tmp_displayed_texture
+                            }
+                        }
+                        _ => (),
+                    }
                     return;
                 }
 
-                match input.virtual_keycode.unwrap() {
-                    VirtualKeyCode::W => {
-                        camera.position[2] -= 1.0;
-                    }
-                    VirtualKeyCode::S => {
-                        camera.position[2] += 1.0;
-                    }
-                    VirtualKeyCode::A => {
-                        camera.position[0] -= 1.0;
-                    }
-                    VirtualKeyCode::D => {
-                        camera.position[0] += 1.0;
-                    }
-                    VirtualKeyCode::R => {
-                        camera.position[1] += 1.0;
-                    }
-                    VirtualKeyCode::F => {
-                        camera.position[1] -= 1.0;
-                    }
-                    VirtualKeyCode::T => {
-                        tmp_displayed_texture += 1;
-                        tmp_displayed_texture = if tmp_displayed_texture > 4 {
-                            0
-                        } else {
-                            tmp_displayed_texture
-                        }
-                    }
-                    _ => (),
+                if input.state == ElementState::Released {
+                    pressed_keys.remove(&current_key);
+                    println!("{:?}", camera.position);
+                    return;
                 }
-
-                println!("{:?}", camera.position);
             }
 
             Event::WindowEvent {
@@ -462,14 +471,23 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                tracing_pipeline_new.uniform_settings_update(
-                    &app.queue,
-                    TracingPipelineSettings {
-                        chunk_count: chunks.chunks_mem.len() as u32,
-                        player_position: camera.position,
-                        _padding: 0,
-                    },
-                );
+                handle_keypressed(&pressed_keys, &mut camera);
+
+                let rnd_number: u16 = rng.gen::<u16>();
+
+             
+                tmp_sample_count = 1.0 / (1.0 + (1.0 / tmp_sample_count));
+
+                let setting_uniform = TracingPipelineSettings {
+                    chunk_count: chunks.chunks_mem.len() as u32,
+                    player_position: camera.position,
+                    frame_random_number: ((rnd_number as u32) << 16)
+                        | (tmp_sample_count * 65535.0) as u32,
+                };
+
+                tracing_pipeline_new.uniform_settings_update(&app.queue, setting_uniform);
+
+                // println!("{}", ((setting_uniform.frame_random_number) & 65535) as f32 / 65535.0);
 
                 let mut encoder = app
                     .device
@@ -496,6 +514,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 );
 
                 app.queue.submit(Some(encoder.finish()));
+
                 frame.present();
             }
 

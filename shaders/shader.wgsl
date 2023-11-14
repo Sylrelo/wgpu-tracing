@@ -48,9 +48,11 @@ fn fs_main(
     @location(1) position: vec4<f32>,
 ) -> @location(0) vec4<f32> {
 
+    let screen_size: vec2<f32> = vec2<f32>(textureDimensions(t_diffuse));
+
     return textureLoad(
         t_diffuse,
-        vec2<i32>(texCoords * vec2(1280.0, 720.0)),
+        vec2<i32>(texCoords * screen_size),
         0,
     );
     // return textureSample(t_diffuse, s_diffuse, texCoords);

@@ -17,7 +17,7 @@ use crate::{
 pub struct TracingPipelineSettings {
     pub player_position: [f32; 4],
     pub chunk_count: u32,
-    pub _padding: u32,
+    pub frame_random_number: u32,
 }
 
 pub struct TracingPipelineBindGroups {
@@ -164,7 +164,7 @@ impl TracingPipelineTest {
             .with_storage_texture(
                 &textures.color_view,
                 TextureFormat::Rgba8Unorm,
-                StorageTextureAccess::WriteOnly,
+                StorageTextureAccess::ReadWrite,
             )
             .visibility(ShaderStages::COMPUTE)
             .done()
