@@ -27,10 +27,16 @@ pub struct App {
     pub swapchain_config: SwapchainData,
 }
 
+// UNIFORMS
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Camera {
     pub position: [f32; 4],
 }
 
-// UNIFORMS
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct RenderUniform {
+    pub position_offset: [f32; 4],
+}

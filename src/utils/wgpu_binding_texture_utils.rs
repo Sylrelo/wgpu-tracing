@@ -1,7 +1,7 @@
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 use wgpu::{
-    BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess,
-    TextureFormat, TextureView, TextureViewDimension,
+    BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, TextureFormat,
+    TextureView, TextureViewDimension,
 };
 
 impl<'a> BindingGeneratorBuilder<'a> {
@@ -71,19 +71,18 @@ impl<'a> BindingGeneratorBuilder<'a> {
         self
     }
 
-    /// @deprecated
-    pub fn with_default_storage_texture(
-        mut self,
-        texture_view: &'a TextureView,
-    ) -> BindingGeneratorBuilder<'a> {
-        self.context.binding_type = BindingType::StorageTexture {
-            access: StorageTextureAccess::WriteOnly,
-            format: TextureFormat::Rgba8Unorm,
-            view_dimension: TextureViewDimension::D2,
-        };
-        self.context.set_texture_view(texture_view);
-        self
-    }
+    // @deprecated pub fn with_default_storage_texture(
+    //     mut self,
+    //     texture_view: &'a TextureView,
+    // ) -> BindingGeneratorBuilder<'a> {
+    //     self.context.binding_type = BindingType::StorageTexture {
+    //         access: StorageTextureAccess::WriteOnly,
+    //         format: TextureFormat::Rgba8Unorm,
+    //         view_dimension: TextureViewDimension::D2,
+    //     };
+    //     self.context.set_texture_view(texture_view);
+    //     self
+    // }
 
     // pub fn with_storage_texture(
     //     mut self,

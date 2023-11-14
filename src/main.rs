@@ -13,7 +13,7 @@ use denoiser_pipeline::DenoiserPipeline;
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
 use tracing_pipeline_new::TracingPipelineTest;
-use wgpu::{Device, Label, ShaderModule};
+use wgpu::{Device, Label, ShaderModule, ShaderStages};
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{ElementState, VirtualKeyCode};
 use winit::window::WindowBuilder;
@@ -137,14 +137,46 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         });
 
     let render_texture_bindgroups = BindingGeneratorBuilder::new(&app.device)
-        .with_texture_and_sampler(&textures.render_view, &textures.render_sanpler)
+        // .with_texture_and_sampler(&textures.render_view, &textures.render_sanpler)
+        .with_texture_only(ShaderStages::FRAGMENT, &textures.render_view)
+        .done()
         .build();
+
+    let render_texture_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_only(ShaderStages::FRAGMENT, &textures.normal_view)
+        .done()
+        .build();
+
+    //tmp
+    let render_texture_bind_group_layout =
+        app.device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        },
+                        count: None,
+                    },
+                    // wgpu::BindGroupLayoutEntry {
+                    //     binding: 1,
+                    //     visibility: wgpu::ShaderStages::FRAGMENT,
+                    //     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    //     count: None,
+                    // },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
 
     let pipeline_layout = app
         .device
         .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&render_texture_bindgroups.bind_group_layout],
+            bind_group_layouts: &[&render_texture_bind_group_layout],
             push_constant_ranges: &[],
         });
 
