@@ -789,6 +789,15 @@ fn main(
         seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
         // wang_hash(&seed);
+
+        let foc_target = ray.orig + ray.dir * 2.7;
+        let defocus = 0.3 * rand2_in_circle(&seed);
+        ray.orig += vec3(defocus.xy, 0.0);
+        ray.dir = normalize(foc_target - ray.orig);
+        precalc_ray(&ray);
+
+
+
         path_tracing_color += pathtrace(ray, &seed, i, screen_pos);
     }
     path_tracing_color = (path_tracing_color / f32(MAX_SAMPLES));

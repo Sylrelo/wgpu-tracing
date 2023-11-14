@@ -15,8 +15,9 @@ pub struct RenderTexture {
 
     pub normal: Texture,
     pub normal_view: TextureView,
-    // pub depth: Texture,
-    // pub depth_view: TextureView,
+
+    pub depth: Texture,
+    pub depth_view: TextureView,
 }
 
 impl RenderTexture {
@@ -37,12 +38,12 @@ impl RenderTexture {
             ..TextureViewDescriptor::default()
         });
 
-        // let depth =
-        //     Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::r);
-        // let depth_view = normal.create_view(&TextureViewDescriptor{
-        //   format: Some(TextureFormat::r),
-        //   ..TextureViewDescriptor::default()
-        // });
+        let depth =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
+        let depth_view = depth.create_view(&TextureViewDescriptor {
+            format: Some(TextureFormat::Rgba8Unorm),
+            ..TextureViewDescriptor::default()
+        });
 
         Self {
             render,
@@ -54,8 +55,9 @@ impl RenderTexture {
 
             normal,
             normal_view,
-            // depth,
-            // depth_view,
+
+            depth,
+            depth_view,
         }
     }
 

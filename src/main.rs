@@ -24,7 +24,7 @@ use winit::{
 };
 
 use log::{error, info};
-use structs::{App, SwapchainData};
+use structs::{App, RenderUniform, SwapchainData};
 
 use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
@@ -90,6 +90,50 @@ fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule>
     };
 }
 
+fn tmp_update_render_uniform(
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    offset_x: f32,
+    offset_y: f32,
+) {
+    queue.write_buffer(
+        buffer,
+        0,
+        bytemuck::cast_slice(&[RenderUniform {
+            position_offset: [offset_x, offset_y, 0.0, 0.0],
+        }]),
+    );
+}
+
+fn tmp_exec_render(
+    encoder: &mut wgpu::CommandEncoder,
+    view: &wgpu::TextureView,
+    pipeline: &wgpu::RenderPipeline,
+    uniform_bind_groups: &wgpu::BindGroup,
+    texture_bind_groups: &wgpu::BindGroup,
+) {
+    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: None,
+        // occlusion_query_set: None,
+        // timestamp_writes: None,
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: view,
+            resolve_target: None,
+
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: true,
+                // store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+    });
+    rpass.set_bind_group(0, &texture_bind_groups, &[]);
+    rpass.set_bind_group(1, &uniform_bind_groups, &[]);
+    rpass.set_pipeline(pipeline);
+    rpass.draw(0..3, 0..1);
+}
+
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
@@ -142,8 +186,29 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .done()
         .build();
 
-    let render_texture_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_normal_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.normal_view)
+        .done()
+        .build();
+
+    let render_texture_color_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_only(ShaderStages::FRAGMENT, &textures.color_view)
+        .done()
+        .build();
+
+    let render_texture_depth_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_only(ShaderStages::FRAGMENT, &textures.depth_view)
+        .done()
+        .build();
+
+    let render_uniform = app.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Label::from("RENDER Pipeline : RENDER UNIFORM"),
+        mapped_at_creation: false,
+        size: 16,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+    let render_uniform_binds = BindingGeneratorBuilder::new(&app.device)
+        .with_default_buffer_uniform(wgpu::ShaderStages::VERTEX, &render_uniform)
         .done()
         .build();
 
@@ -176,7 +241,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .device
         .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&render_texture_bind_group_layout],
+            bind_group_layouts: &[
+                &render_texture_bind_group_layout,
+                &render_uniform_binds.bind_group_layout,
+            ],
             push_constant_ranges: &[],
         });
 
@@ -291,6 +359,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
     let mut already_uploaded_tmp = false;
+    let mut tmp_displayed_texture = 1;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -326,6 +395,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     }
                     VirtualKeyCode::F => {
                         camera.position[1] -= 1.0;
+                    }
+                    VirtualKeyCode::T => {
+                        tmp_displayed_texture += 1;
+                        tmp_displayed_texture = if tmp_displayed_texture > 3 {
+                            0
+                        } else {
+                            tmp_displayed_texture
+                        }
                     }
                     _ => (),
                 }
@@ -395,32 +472,24 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 // tracing_pipeline.compute_pass(&mut encoder);
                 tracing_pipeline_new.exec_pass(&mut encoder);
-                // denoiser_pipeline.exec_pass(&mut encoder);
+                denoiser_pipeline.exec_pass(&mut encoder);
 
-                {
-                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
-                        // occlusion_query_set: None,
-                        // timestamp_writes: None,
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
+                let texture_group = match tmp_displayed_texture {
+                    1 => &render_texture_color_debug_bindgroups.bind_group,
+                    2 => &render_texture_normal_debug_bindgroups.bind_group,
+                    3 => &render_texture_depth_debug_bindgroups.bind_group,
+                    _ => &render_texture_bindgroups.bind_group,
+                };
 
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: true,
-                                // store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                    });
-                    rpass.set_bind_group(0, &render_texture_bindgroups.bind_group, &[]); // NEW!
-                    rpass.set_pipeline(&render_pipeline.pipeline);
-                    rpass.draw(0..3, 0..1);
-                }
+                tmp_exec_render(
+                    &mut encoder,
+                    &view,
+                    &render_pipeline.pipeline,
+                    &render_uniform_binds.bind_group,
+                    &texture_group,
+                );
 
                 app.queue.submit(Some(encoder.finish()));
-
                 frame.present();
             }
 

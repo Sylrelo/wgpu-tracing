@@ -168,6 +168,13 @@ impl TracingPipelineTest {
             )
             .visibility(ShaderStages::COMPUTE)
             .done()
+            .with_storage_texture(
+                &textures.depth_view,
+                TextureFormat::Rgba8Unorm,
+                StorageTextureAccess::WriteOnly,
+            )
+            .visibility(ShaderStages::COMPUTE)
+            .done()
             .build()
     }
 

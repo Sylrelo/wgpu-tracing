@@ -7,10 +7,10 @@ var color_map: texture_2d<f32>;
 @group(0) @binding(1)
 var normal_map: texture_2d<f32>;
 
-// @group(0) @binding(2)
-// var depth_map: texture_storage_2d<rgba8unorm, read>;
-
 @group(0) @binding(2)
+var depth_map: texture_2d<f32>;
+
+@group(0) @binding(3)
 var output_texture: texture_storage_2d<rgba8unorm, write>;
 
 struct DenoiseSettings {
@@ -54,7 +54,7 @@ fn main(
 
     let step = vec2(1. / 1280., 1. / 720.); // resolution
 
-    var denoiser_setting = DenoiseSettings(0.3, 0.05, 0.1, 4.0);
+    var denoiser_setting = DenoiseSettings(0.5, 0.05, 0.5, 4.0);
     var final_color = vec3(0.0);
 
     var cval = textureLoad(color_map, screen_pos, 0).rgb;
@@ -68,6 +68,7 @@ fn main(
         var sum = vec3(0.0);
         // let cval = textureLoad(color_map, screen_pos, 0).rgb;
         let nval = textureLoad(normal_map, screen_pos, 0).xyz;
+        let dval = textureLoad(depth_map, screen_pos, 0).x;
 
         let sf2 = pow(2.0, f32(e));
 
@@ -78,6 +79,7 @@ fn main(
 
             let ctmp = textureLoad(color_map, uv, 0).rgb;
             let ntmp = textureLoad(normal_map, uv, 0).xyz;
+            let dtmp = textureLoad(depth_map, uv, 0).x;
 
             var color_diff = cval.rgb - ctmp.rgb;
             let c_w = min(exp(-dot(color_diff, color_diff)) / denoiser_setting.c_phi, 1.0);
@@ -88,8 +90,12 @@ fn main(
             let n_w = min(exp(-(normal_d) / denoiser_setting.n_phi), 1.0f);
 
 
+
+            let pt = abs(dval - dtmp);
+            let p_w = max(min(1.0 - pt / denoiser_setting.p_phi, 1.0), 0.0);
+
             // let weight = c_w * KERNEL[i];
-            let weight = c_w * n_w * KERNEL[i];
+            let weight = c_w * n_w * p_w * KERNEL[i];
 
             sum += ctmp.rgb * weight;
             cum_w += weight;

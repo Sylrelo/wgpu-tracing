@@ -43,6 +43,9 @@ var normal_output: texture_storage_2d<rgba8snorm, write>;
 @group(2) @binding(2)
 var color_output2: texture_storage_2d<rgba8unorm, write>;
 
+@group(2) @binding(3)
+var depth_output: texture_storage_2d<rgba8unorm, write>;
+
 // CONSTANTS =================================================
 
 const M_PI = 3.1415926535897932384626433832795;
@@ -506,6 +509,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
 
         if i == 0 {
             textureStore(normal_output, screen_pos, normal.xyzz);
+            textureStore(depth_output, screen_pos, vec4(vec3(voxel_hit.t / 500.0), 1.0));
         }
 
         var vox_color = normal * 0.5 + 0.5;
@@ -629,8 +633,8 @@ fn main(
         // seed = (1973u * 9277u + u32(i) * 26699u) | (1u);
         seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + u32(i) * 26699u) | (1u);
 
-        // let foc_target = ray.orig + ray.dir * 2.7;
-        // let defocus = 0.3 * rand2_in_circle(&seed);
+        // let foc_target = ray.orig + ray.dir * 2.3;
+        // let defocus = 0.05 * rand2_in_circle(&seed);
 
         // ray.orig += vec3(defocus.xy, 0.0);
         // ray.dir = normalize(foc_target - ray.orig);

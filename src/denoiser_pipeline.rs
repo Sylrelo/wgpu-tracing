@@ -53,6 +53,8 @@ impl DenoiserPipeline {
             .done()
             .with_texture_only(ShaderStages::COMPUTE, &textures.normal_view)
             .done()
+            .with_texture_only(ShaderStages::COMPUTE, &textures.depth_view)
+            .done()
             .with_storage_texture(
                 &textures.render_view,
                 TextureFormat::Rgba8Unorm,
