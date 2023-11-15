@@ -136,7 +136,9 @@ fn main(
 
     // if screen_pos.x >= 640 {
         // let nval = textureLoad(normal_map, tx, 0).xyz;
-    textureStore(output_texture, screen_pos, vec4(final_color / f32(max_sample), 1.0));
+    // textureStore(output_texture, screen_pos, vec4(final_color / f32(max_sample), 1.0));
+    cval = textureLoad(color_map, screen_pos, 0).rgb;
+    textureStore(output_texture, screen_pos, vec4(cval.xyz, 1.0));
     // }
 
     // let pval = texture2D(posMap, gl_TexCoord[0].st);

@@ -522,7 +522,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
             let current_position = vec4((point * 0.001), 1.0);
             textureStore(depth_output, screen_pos, current_position);
 
-            textureStore(velocity_texture, screen_pos, vec4((current_position.xyz - prev_position.xyz) * 1000.0, 1.0));
+            textureStore(velocity_texture, screen_pos, vec4(((current_position.xyz * 0.5 + 0.5) - (prev_position.xyz * 0.5 + 0.5)) * 1000.0, 1.0));
             // textureStore(depth_output, screen_pos, vec4(vec3(voxel_hit.t / 500.0), 1.0));
         }
 

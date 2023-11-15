@@ -13,6 +13,7 @@ use std::{thread, time};
 use denoiser_pipeline::DenoiserPipeline;
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
+use pipelines::fxaa::fxaa_pipeline::FXAAPipeline;
 use pipelines::upscaler::pipeline::UpscalerPipeline;
 use rand::Rng;
 use tracing_pipeline_new::TracingPipelineTest;
@@ -156,7 +157,7 @@ fn tmp_exec_render(
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let app = App::new(window).await;
     let mut camera = Camera {
-        position: [192.0, 156.0, 381.0, 0.0],
+        position: [189.0, 40.0, 339.0, 0.0],
         // position: [0.0, 265.0, 0.0, 0.0],
     };
     let textures = RenderTexture::new(&app.device);
@@ -191,6 +192,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         Arc::new(Mutex::new(TracingPipelineTest::new(&app.device, &textures)));
 
     let mut upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
+    let mut fxaa_pipeline = FXAAPipeline::new(&app.device, &textures);
 
     // let upscaler_pipeline = Upsca
     let mut chunks = Chunk::init();
@@ -506,7 +508,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 // tracing_pipeline.compute_pass(&mut encoder);
                 tracing_pipeline_new.exec_pass(&mut encoder);
+
                 denoiser_pipeline.exec_pass(&mut encoder);
+
+                fxaa_pipeline.exec_pass(&mut encoder);
+
                 upscaler_pipeline.exec_passes(&mut encoder);
 
                 let texture_group = match tmp_displayed_texture {
@@ -527,7 +533,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 );
 
                 app.queue.submit(Some(encoder.finish()));
-
                 frame.present();
             }
 

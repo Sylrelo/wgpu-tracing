@@ -33,6 +33,7 @@ fn FsrRcasLoadF(pos: vec2<f32>) -> vec3<f32> {
     return textureLoad(texture, vec2<i32>(vec2<f32>(pos))).rgb;
 }
 
+
 fn FsrRcasF(
     ip: vec2<f32>,
     con: f32
@@ -40,7 +41,7 @@ fn FsrRcasF(
 
     let sp = vec2(ip);
     let b = FsrRcasLoadF(sp + vec2(0.0, -1.0)).rgb;
-    let d = FsrRcasLoadF(sp + vec2(-.01, 0.0)).rgb;
+    let d = FsrRcasLoadF(sp + vec2(-1.0, 0.0)).rgb;
     let e = FsrRcasLoadF(sp).rgb;
     let f = FsrRcasLoadF(sp + vec2(1.0, 0.0)).rgb;
     let h = FsrRcasLoadF(sp + vec2(0.0, 1.0)).rgb;
