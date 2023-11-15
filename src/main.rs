@@ -41,10 +41,11 @@ mod denoiser_pipeline;
 mod init_render_pipeline;
 mod init_textures;
 mod init_wgpu;
+mod pipelines;
 mod structs;
 mod tracing_pipeline_new;
 mod utils;
-mod pipelines;
+mod wgpu_utils;
 
 impl App {
     pub async fn new(window: Window) -> App {
@@ -66,7 +67,6 @@ impl App {
 }
 
 fn handle_keypressed(pressed_keys: &HashSet<VirtualKeyCode>, camera: &mut Camera) {
-
     let fast_modifier = if pressed_keys.contains(&VirtualKeyCode::LShift) {
         3.0
     } else if pressed_keys.contains(&VirtualKeyCode::LAlt) {
@@ -95,34 +95,34 @@ fn handle_keypressed(pressed_keys: &HashSet<VirtualKeyCode>, camera: &mut Camera
     }
 }
 
-fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule> {
-    let file = File::open(shader_path);
-    let mut buff: String = String::new();
-    file.unwrap()
-        .read_to_string(&mut buff)
-        .expect("TODO: panic message");
+// fn compile_shader(device: &Device, shader_path: &String) -> Option<ShaderModule> {
+//     let file = File::open(shader_path);
+//     let mut buff: String = String::new();
+//     file.unwrap()
+//         .read_to_string(&mut buff)
+//         .expect("TODO: panic message");
 
-    let shader = naga::front::wgsl::parse_str(&buff);
+//     let shader = naga::front::wgsl::parse_str(&buff);
 
-    return if let Ok(shader) = shader {
-        let validator =
-            naga::valid::Validator::new(ValidationFlags::all(), Capabilities::default())
-                .validate(&shader);
+//     return if let Ok(shader) = shader {
+//         let validator =
+//             naga::valid::Validator::new(ValidationFlags::all(), Capabilities::default())
+//                 .validate(&shader);
 
-        if validator.is_err() {
-            error!(target: "compile_shader", "{}", validator.err().unwrap());
-            return None;
-        }
+//         if validator.is_err() {
+//             error!(target: "compile_shader", "{}", validator.err().unwrap());
+//             return None;
+//         }
 
-        Some(device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Label::from("Reloaded Shader"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*buff)),
-        }))
-    } else {
-        error!(target: "compile_shader", "{}", shader.err().unwrap());
-        None
-    };
-}
+//         Some(device.create_shader_module(wgpu::ShaderModuleDescriptor {
+//             label: Label::from("Reloaded Shader"),
+//             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*buff)),
+//         }))
+//     } else {
+//         error!(target: "compile_shader", "{}", shader.err().unwrap());
+//         None
+//     };
+// }
 
 fn tmp_exec_render(
     encoder: &mut wgpu::CommandEncoder,
@@ -133,16 +133,16 @@ fn tmp_exec_render(
 ) {
     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: None,
-        // occlusion_query_set: None,
-        // timestamp_writes: None,
+        occlusion_query_set: None,
+        timestamp_writes: None,
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
             view: view,
             resolve_target: None,
 
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: true,
-                // store: wgpu::StoreOp::Store,
+                // store: true,
+                store: wgpu::StoreOp::Store,
             },
         })],
         depth_stencil_attachment: None,
@@ -190,7 +190,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let tracing_pipeline_new =
         Arc::new(Mutex::new(TracingPipelineTest::new(&app.device, &textures)));
 
-    let upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
+    let mut upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
 
     // let upscaler_pipeline = Upsca
     let mut chunks = Chunk::init();
@@ -224,7 +224,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .done()
         .build();
 
-        let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.velocity_view)
         .done()
         .build();
@@ -325,58 +325,58 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let tracing_pipeline1 = tracing_pipeline_new.clone();
 
     let app = app_arc.clone();
-    let mut watcher = notify::recommended_watcher(move |res| match res {
-        Ok(event) => {
-            let ev = event as notify::event::Event;
+    // let mut watcher = notify::recommended_watcher(move |res| match res {
+    //     Ok(event) => {
+    //         let ev = event as notify::event::Event;
 
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+    //         let now = SystemTime::now()
+    //             .duration_since(UNIX_EPOCH)
+    //             .unwrap()
+    //             .as_secs();
 
-            if now - last_modified >= 1 && ev.kind.is_modify() {
-                thread::sleep(time::Duration::from_millis(50));
-                let shader_path = ev.paths[0].clone().to_str().unwrap().to_string();
+    //         if now - last_modified >= 1 && ev.kind.is_modify() {
+    //             thread::sleep(time::Duration::from_millis(50));
+    //             let shader_path = ev.paths[0].clone().to_str().unwrap().to_string();
 
-                let shader_module = compile_shader(&app.lock().unwrap().device, &shader_path);
-                if let Some(shader_module) = shader_module {
-                    println!("Hey {}", shader_path);
-                    if shader_path.contains("simple_raytracer_tests.wgsl") {
-                        tracing_pipeline1
-                            .lock()
-                            .unwrap()
-                            .recreate_pipeline(&app.lock().unwrap().device, shader_module);
-                        app.lock().unwrap().window.request_redraw();
-                        info!("Shader reloaded !");
-                    }
-                    // if shader_path.contains("compute.wgsl") {
-                    //     tracing_pipeline1
-                    //         .lock()
-                    //         .unwrap()
-                    //         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
-                    //     app.lock().unwrap().window.request_redraw();
-                    //     info!("Shader reloaded !");
-                    // } else if shader_path.contains("denoiser.wgsl") {
-                    //     denoiser_pipeline1
-                    //         .lock()
-                    //         .unwrap()
-                    //         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+    //             let shader_module = compile_shader(&app.lock().unwrap().device, &shader_path);
+    //             if let Some(shader_module) = shader_module {
+    //                 println!("Hey {}", shader_path);
+    //                 if shader_path.contains("simple_raytracer_tests.wgsl") {
+    //                     tracing_pipeline1
+    //                         .lock()
+    //                         .unwrap()
+    //                         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+    //                     app.lock().unwrap().window.request_redraw();
+    //                     info!("Shader reloaded !");
+    //                 }
+    //                 // if shader_path.contains("compute.wgsl") {
+    //                 //     tracing_pipeline1
+    //                 //         .lock()
+    //                 //         .unwrap()
+    //                 //         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
+    //                 //     app.lock().unwrap().window.request_redraw();
+    //                 //     info!("Shader reloaded !");
+    //                 // } else if shader_path.contains("denoiser.wgsl") {
+    //                 //     denoiser_pipeline1
+    //                 //         .lock()
+    //                 //         .unwrap()
+    //                 //         .recreate_pipeline(&app.lock().unwrap().device, shader_module);
 
-                    //     app.lock().unwrap().window.request_redraw();
-                    //     info!("Shader reloaded !");
-                    // }
-                }
+    //                 //     app.lock().unwrap().window.request_redraw();
+    //                 //     info!("Shader reloaded !");
+    //                 // }
+    //             }
 
-                last_modified = now;
-            }
-        }
-        Err(e) => println!("watch error: {:?}", e),
-    })
-    .unwrap();
+    //             last_modified = now;
+    //         }
+    //     }
+    //     Err(e) => println!("watch error: {:?}", e),
+    // })
+    // .unwrap();
 
-    watcher
-        .watch(Path::new("./shaders/"), RecursiveMode::NonRecursive)
-        .expect("TODO: panic message");
+    // watcher
+    //     .watch(Path::new("./shaders/"), RecursiveMode::NonRecursive)
+    //     .expect("TODO: panic message");
 
     let app = app_arc.clone();
     // let tracing_pipeline = tracing_pipeline.clone();
@@ -462,6 +462,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
+                    upscaler_pipeline.shader_realtime_compilation(&app.device, &app.window);
+
                     app.window.set_title(
                         format!("{:3} FPS - {:3} ms", fps, 1000.0 / fps as f32).as_str(),
                     );
@@ -485,7 +487,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 let rnd_number: u16 = rng.gen::<u16>();
 
-             
                 tmp_sample_count = 1.0 / (1.0 + (1.0 / tmp_sample_count));
 
                 let setting_uniform = TracingPipelineSettings {
@@ -506,7 +507,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // tracing_pipeline.compute_pass(&mut encoder);
                 tracing_pipeline_new.exec_pass(&mut encoder);
                 denoiser_pipeline.exec_pass(&mut encoder);
-                upscaler_pipeline.exec_pass(&mut encoder);
+                upscaler_pipeline.exec_passes(&mut encoder);
 
                 let texture_group = match tmp_displayed_texture {
                     1 => &render_texture_bindgroups.bind_group,
