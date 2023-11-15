@@ -13,6 +13,7 @@ use std::{thread, time};
 use denoiser_pipeline::DenoiserPipeline;
 use naga::valid::{Capabilities, ValidationFlags};
 use notify::{RecursiveMode, Watcher};
+use pipelines::upscaler::pipeline::UpscalerPipeline;
 use rand::Rng;
 use tracing_pipeline_new::TracingPipelineTest;
 use wgpu::{Device, Label, ShaderModule, ShaderStages};
@@ -26,7 +27,7 @@ use winit::{
 };
 
 use log::{error, info};
-use structs::{App, RenderUniform, SwapchainData};
+use structs::{App, SwapchainData};
 
 use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
@@ -43,6 +44,7 @@ mod init_wgpu;
 mod structs;
 mod tracing_pipeline_new;
 mod utils;
+mod pipelines;
 
 impl App {
     pub async fn new(window: Window) -> App {
@@ -188,6 +190,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let tracing_pipeline_new =
         Arc::new(Mutex::new(TracingPipelineTest::new(&app.device, &textures)));
 
+    let upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
+
+    // let upscaler_pipeline = Upsca
     let mut chunks = Chunk::init();
     //////////
 
@@ -219,8 +224,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .done()
         .build();
 
-    let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.velocity_view)
+        .done()
+        .build();
+
+    let render_texture_final_view_bindgroups = BindingGeneratorBuilder::new(&app.device)
+        .with_texture_only(ShaderStages::FRAGMENT, &textures.final_render_view)
         .done()
         .build();
 
@@ -382,7 +392,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     chunks.generate_around([0.0, 0.0, 0.0, 0.0]);
     let mut already_uploaded_tmp = false;
-    let mut tmp_displayed_texture = 1;
+    let mut tmp_displayed_texture = 0;
     let mut rng = rand::thread_rng();
     let mut tmp_sample_count: f32 = 1.0;
 
@@ -406,7 +416,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     match current_key {
                         VirtualKeyCode::T => {
                             tmp_displayed_texture += 1;
-                            tmp_displayed_texture = if tmp_displayed_texture > 4 {
+                            tmp_displayed_texture = if tmp_displayed_texture > 5 {
                                 0
                             } else {
                                 tmp_displayed_texture
@@ -496,13 +506,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // tracing_pipeline.compute_pass(&mut encoder);
                 tracing_pipeline_new.exec_pass(&mut encoder);
                 denoiser_pipeline.exec_pass(&mut encoder);
+                upscaler_pipeline.exec_pass(&mut encoder);
 
                 let texture_group = match tmp_displayed_texture {
-                    1 => &render_texture_color_debug_bindgroups.bind_group,
-                    2 => &render_texture_normal_debug_bindgroups.bind_group,
-                    3 => &render_texture_depth_debug_bindgroups.bind_group,
-                    4 => &render_texture_velocity_debug_bindgroups.bind_group,
-                    _ => &render_texture_bindgroups.bind_group,
+                    1 => &render_texture_bindgroups.bind_group,
+                    2 => &render_texture_color_debug_bindgroups.bind_group,
+                    3 => &render_texture_normal_debug_bindgroups.bind_group,
+                    4 => &render_texture_depth_debug_bindgroups.bind_group,
+                    5 => &render_texture_velocity_debug_bindgroups.bind_group,
+                    _ => &render_texture_final_view_bindgroups.bind_group,
                 };
 
                 tmp_exec_render(

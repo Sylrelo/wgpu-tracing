@@ -21,6 +21,9 @@ pub struct RenderTexture {
 
     pub velocity: Texture,
     pub velocity_view: TextureView,
+
+    pub final_render: Texture,
+    pub final_render_view: TextureView,
 }
 
 impl RenderTexture {
@@ -55,6 +58,13 @@ impl RenderTexture {
             ..TextureViewDescriptor::default()
         });
 
+        let final_render =
+            Self::create_texture_helper(device, 1920, 1080, TextureFormat::Rgba8Unorm);
+        let final_render_view = final_render.create_view(&TextureViewDescriptor {
+            format: Some(TextureFormat::Rgba8Unorm),
+            ..TextureViewDescriptor::default()
+        });
+
         Self {
             render,
             render_view,
@@ -71,6 +81,9 @@ impl RenderTexture {
 
             velocity,
             velocity_view,
+
+            final_render,
+final_render_view
         }
     }
 
