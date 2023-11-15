@@ -52,9 +52,8 @@ impl UpscalerPipeline {
     }
 
     pub fn recreate_pipelines(&mut self, device: &Device, shader_module: ShaderModule) {
-        self.upscale =
-            Self::init_pipeline(device, &self.bind_groups_easu, &self.upscale_shader_module);
-        self.upscale_shader_module = shader_module;
+        self.sharpen = Self::init_pipeline(device, &self.bind_groups_rcas, &shader_module);
+        self.sharpen_shader_module = shader_module;
     }
 
     pub fn exec_passes(&self, encoder: &mut CommandEncoder) {
@@ -83,7 +82,7 @@ impl UpscalerPipeline {
     // ===============================
 
     pub fn shader_realtime_compilation(&mut self, device: &Device, window: &Window) {
-        const SHADER_PATH: &str = "src/pipelines/upscaler/amd_fsr_easu.wgsl";
+        const SHADER_PATH: &str = "src/pipelines/upscaler/amd_fsr_rcas.wgsl";
         static mut LAST_TIME: u64 = 0;
 
         let modification_time = fs::metadata(SHADER_PATH);
