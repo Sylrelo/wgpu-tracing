@@ -156,7 +156,7 @@ impl UpscalerPipeline {
     fn create_easu_bind_groups(device: &Device, textures: &RenderTexture) -> BindGroups {
         BindingGeneratorBuilder::new(device)
             .with_storage_texture(
-                &textures.render_view,
+                &textures.accumulated_view,
                 TextureFormat::Rgba8Unorm,
                 StorageTextureAccess::ReadOnly,
             )

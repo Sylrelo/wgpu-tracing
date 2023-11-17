@@ -8,6 +8,7 @@ use wgpu::{
 use winit::window::Window;
 
 use crate::{
+    camera::Camera,
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
@@ -48,16 +49,17 @@ pub struct TracingPipelineTest {
 
 #[allow(dead_code)]
 impl TracingPipelineTest {
-    pub fn new(device: &Device, textures: &RenderTexture) -> Self {
+    pub fn new(device: &Device, textures: &RenderTexture, camera_buffer: &Buffer) -> Self {
         println!("Init TracingPipelineTest");
 
         let buffers = Self::create_buffers(device);
 
         let bind_groups = TracingPipelineBindGroups {
             textures: Self::create_textures_bind_groups(device, textures),
-            uniforms: Self::uniform_create_bind_groups(device, &buffers.uniform),
+            uniforms: Self::uniform_create_bind_groups(device, &buffers.uniform, &camera_buffer),
             buffers: Self::buffers_create_bind_groups(device, &buffers),
         };
+
         println!("Buffers done.");
 
         let shader_module = Self::get_shader_module(device);
@@ -192,7 +194,7 @@ impl TracingPipelineTest {
             .done()
             .with_storage_texture(
                 &textures.velocity_view,
-                TextureFormat::Rgba32Float,
+                TextureFormat::Rg32Float,
                 StorageTextureAccess::WriteOnly,
             )
             .visibility(ShaderStages::COMPUTE)
@@ -203,9 +205,15 @@ impl TracingPipelineTest {
             .build()
     }
 
-    fn uniform_create_bind_groups(device: &Device, buffer: &Buffer) -> BindGroups {
+    fn uniform_create_bind_groups(
+        device: &Device,
+        settings_buffer: &Buffer,
+        camera_buffer: &Buffer,
+    ) -> BindGroups {
         BindingGeneratorBuilder::new(device)
-            .with_default_buffer_uniform(ShaderStages::COMPUTE, buffer)
+            .with_default_buffer_uniform(ShaderStages::COMPUTE, settings_buffer)
+            .done()
+            .with_default_buffer_uniform(ShaderStages::COMPUTE, camera_buffer)
             .done()
             .build()
     }
@@ -230,7 +238,7 @@ impl TracingPipelineTest {
         let chunk_content = device.create_buffer(&BufferDescriptor {
             label: Label::from("Tracing Pipeline : Chunk Content Buffer"),
             mapped_at_creation: false,
-            size: 2147483640,
+            size: 1147483640,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 

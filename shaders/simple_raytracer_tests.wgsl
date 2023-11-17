@@ -1,5 +1,15 @@
 // STRUCTURES ================================================
 
+struct CameraUniform {
+     position: vec4<f32>,
+
+     perspective: mat4x4<f32>,
+     perspective_inverse: mat4x4<f32>,
+
+     view: mat4x4<f32>,
+};
+
+
 struct Settings {
     position: vec4<f32>,
     chunk_content_count: u32,
@@ -28,6 +38,9 @@ struct DataDda {
 @group(0) @binding(0)
 var<uniform> settings: Settings;
 
+@group(0) @binding(1)
+var<uniform> camera: CameraUniform;
+
 @group(1) @binding(0)
 var<storage> chunk_content: array<u32>;
 
@@ -47,7 +60,7 @@ var color_output: texture_storage_2d<rgba8unorm, read_write>;
 var depth_output: texture_storage_2d<rgba32float, read_write>;
 
 @group(2) @binding(3)
-var velocity_texture: texture_storage_2d<rgba32float, write>;
+var velocity_texture: texture_storage_2d<rg32float, write>;
 
 // CONSTANTS =================================================
 
@@ -516,10 +529,14 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         if i == 0 || (is_prev_reflection && i == 1) {
             textureStore(normal_output, screen_pos, normal.xyzz);
 
-            let current_position = vec4((point * 0.001), 1.0);
+            let current_position = vec4(point, 1.0);
             textureStore(depth_output, screen_pos, current_position);
 
-            textureStore(velocity_texture, screen_pos, vec4(((current_position.xyz * 0.5 + 0.5) - (prev_position.xyz * 0.5 + 0.5)) * 1000.0, 1.0));
+            textureStore(
+                velocity_texture,
+                screen_pos,
+                vec4(((current_position.xy) - (prev_position.xy)), 1.0, 1.0)
+            );
             // textureStore(depth_output, screen_pos, vec4(vec3(voxel_hit.t / 500.0), 1.0));
         }
 
@@ -628,7 +645,8 @@ fn main(
     var ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
 
     var ray: Ray = Ray(
-        settings.position.xyz,
+        camera.position.xyz,
+        // settings.position.xyz,
         ray_direction,
         1.0 / ray_direction
     );
@@ -642,8 +660,9 @@ fn main(
     // ray.dir = vec_rot_y(ray.dir, -1.9);
     precalc_ray(&ray);
 
-    // textureStore(normal_output, screen_pos, vec4(0.0));
+    textureStore(normal_output, screen_pos, vec4(0.0));
     // textureStore(depth_output, screen_pos, vec4(0.0));
+    textureStore(velocity_texture, screen_pos, vec4(0.0));
     
     // var last_blend = prev_color.a;
     // if last_blend == 0.0 {
@@ -652,8 +671,8 @@ fn main(
 
     let blending = f32((settings.frame_random_number) & 65535u) / 65535.0;
 
-    // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + 26699u) | (1u);
-    seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
+    seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + 26699u) | (1u);
+    // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
 
         // let foc_target = ray.orig + ray.dir * 20.0;
         // let defocus = 0.12 * rand2_in_circle(&seed);
@@ -661,6 +680,11 @@ fn main(
         // ray.orig += vec3(defocus.xy, 0.0);
         // ray.dir = normalize(foc_target - ray.orig);
         // precalc_ray(&ray);
+
+    let rnd = random_float_01(&seed);
+
+    // ray.orig.x += ((rnd * 0.5) - rnd) * 0.01;
+    // ray.orig.y += ((rnd * 0.5) - rnd) * 0.01;
 
     final_color = pathtrace(ray, &seed, screen_pos);
     // }
@@ -678,7 +702,7 @@ fn main(
     var prev_color = textureLoad(color_output, screen_pos);
     prev_color = mix(prev_color.xyzz, tone_mapping.xyzz, blending);
 
-    textureStore(color_output, screen_pos, vec4(prev_color.xyz, 1.0));
+    textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
     // textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
     // textureStore(color_output, screen_pos, vec4(raytrace(ray, ndc_pixel).xyz, 1.0));
 }

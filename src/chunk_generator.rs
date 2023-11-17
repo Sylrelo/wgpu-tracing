@@ -51,7 +51,7 @@ impl Chunk {
         self.generated_chunks
             .insert(position, chunk_offset / CHUNK_MEM_OFFSET);
 
-        println!("{:?}", position);
+        // println!("{:?}", position);
 
         for x in 0..CHUNK_X {
             for z in 0..CHUNK_Z {
@@ -135,12 +135,12 @@ impl Chunk {
                 self.root_grid[(x + z * 30) as usize] = [0, 0, 0, 0];
 
                 if chk.is_none() {
-                    print!("       | ");
+                    // print!("       | ");
                 } else {
                     // print!("{:5} | ", self.root_grid[x + z * 20]);
                     let val = chk.unwrap();
                     // print!("{:8} | ", val * CHUNK_TSIZE + 1);
-                    print!("{:2}  {:2} | ", chunk_pos[0], chunk_pos[2]);
+                    // print!("{:2}  {:2} | ", chunk_pos[0], chunk_pos[2]);
                     self.root_grid[(x + z * 30) as usize] = [
                         (chunk_pos[0]) * CHUNK_X as i32,
                         0,
@@ -149,7 +149,7 @@ impl Chunk {
                     ];
                 }
             }
-            println!("");
+            // println!("");
         }
         println!("-> {}", self.generated_chunks.len());
         // println!("{:?} {:?}", player_pos, player_pos_chunk);

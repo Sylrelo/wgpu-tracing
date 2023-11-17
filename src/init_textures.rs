@@ -6,10 +6,6 @@ use wgpu::{
 use crate::structs::{INTERNAL_H, INTERNAL_W};
 
 pub struct RenderTexture {
-    pub render: Texture,
-    pub render_view: TextureView,
-    pub render_sanpler: Sampler,
-
     pub color: Texture,
     pub color_view: TextureView,
 
@@ -22,17 +18,21 @@ pub struct RenderTexture {
     pub velocity: Texture,
     pub velocity_view: TextureView,
 
+    pub accumulated: Texture,
+    pub accumulated_view: TextureView,
+    pub accumulated_history: Texture,
+    pub accumulated_history_view: TextureView,
+
+    pub render: Texture,
+    pub render_view: TextureView,
+    pub render_sanpler: Sampler,
+
     pub final_render: Texture,
     pub final_render_view: TextureView,
 }
 
 impl RenderTexture {
     pub fn new(device: &Device) -> Self {
-        let render =
-            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
-        let render_view = render.create_view(&TextureViewDescriptor::default());
-        let render_sanpler = Self::create_sampler_helper(device);
-
         let color =
             Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
         let color_view = color.create_view(&TextureViewDescriptor::default());
@@ -52,12 +52,29 @@ impl RenderTexture {
         });
 
         let velocity =
-            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba32Float);
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rg32Float);
         let velocity_view = velocity.create_view(&TextureViewDescriptor {
-            format: Some(TextureFormat::Rgba32Float),
+            format: Some(TextureFormat::Rg32Float),
             ..TextureViewDescriptor::default()
         });
+        //
 
+        let accumulated =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
+        let accumulated_view = accumulated.create_view(&TextureViewDescriptor::default());
+
+        let accumulated_history =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
+        let accumulated_history_view =
+            accumulated_history.create_view(&TextureViewDescriptor::default());
+
+        // result of all low-res post-processing effects
+        let render =
+            Self::create_texture_helper(device, INTERNAL_W, INTERNAL_H, TextureFormat::Rgba8Unorm);
+        let render_view = render.create_view(&TextureViewDescriptor::default());
+        let render_sanpler = Self::create_sampler_helper(device);
+
+        // final AMD FSR 1.0 upscaled result
         let final_render =
             Self::create_texture_helper(device, 1920, 1080, TextureFormat::Rgba8Unorm);
         let final_render_view = final_render.create_view(&TextureViewDescriptor {
@@ -73,6 +90,12 @@ impl RenderTexture {
             color,
             color_view,
 
+            accumulated,
+            accumulated_view,
+
+            accumulated_history,
+            accumulated_history_view,
+
             normal,
             normal_view,
 
@@ -83,7 +106,7 @@ impl RenderTexture {
             velocity_view,
 
             final_render,
-final_render_view
+            final_render_view,
         }
     }
 

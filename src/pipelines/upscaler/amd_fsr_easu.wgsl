@@ -48,7 +48,7 @@ struct FsrEasuConData {
 }
 
 fn FsrEasuCF(pos: vec2<f32>) -> vec3<f32> {
-    return textureLoad(input_texture, vec2<i32>(vec2<f32>(pos) * vec2(1280.0 * 1.0, 720.0 * 1.0))).rgb;
+    return textureLoad(input_texture, vec2<i32>(vec2<f32>(pos) * vec2(1280.0 * 0.5, 720.0 * 0.5))).rgb;
 }
 
 fn FsrEasuCon(

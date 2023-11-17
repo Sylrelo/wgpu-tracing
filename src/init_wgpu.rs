@@ -45,12 +45,11 @@ impl InitWgpu {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+                    features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+                        | wgpu::Features::TIMESTAMP_QUERY,
                     limits: Limits {
-                        max_storage_buffer_binding_size: 2147483647,
+                        max_storage_buffer_binding_size: 1147483647,
                         max_buffer_size: 2147483647,
-                        // max_storage_buffer_binding_size: 536870912,
-                        // max_buffer_size: 536870912,
                         ..wgpu::Limits::default()
                     },
                 },

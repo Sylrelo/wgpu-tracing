@@ -4,12 +4,15 @@ use std::collections::HashSet;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use camera::Camera;
+use cgmath::SquareMatrix;
 use denoiser_pipeline::DenoiserPipeline;
 use pipelines::fxaa::fxaa_pipeline::FXAAPipeline;
+use pipelines::temporal_reprojection::temporal_reprojection::TemporalReprojection;
 use pipelines::upscaler::pipeline::UpscalerPipeline;
 use rand::Rng;
 use tracing_pipeline_new::TracingPipelineTest;
-use wgpu::{Label, ShaderStages};
+use wgpu::{BufferUsages, Label, ShaderStages};
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{ElementState, VirtualKeyCode};
 use winit::window::WindowBuilder;
@@ -24,10 +27,11 @@ use structs::{App, SwapchainData};
 use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{Camera, RenderContext, INTERNAL_H, INTERNAL_W};
+use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline_new::TracingPipelineSettings;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
+mod camera;
 mod chunk_generator;
 mod denoiser_pipeline;
 mod init_render_pipeline;
@@ -67,23 +71,29 @@ fn handle_keypressed(pressed_keys: &HashSet<VirtualKeyCode>, camera: &mut Camera
         1.0
     };
 
+    let mut move_by = [0.0, 0.0, 0.0];
+
     if pressed_keys.contains(&VirtualKeyCode::W) {
-        camera.position[2] -= 0.25 * fast_modifier;
+        move_by[2] -= 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::S) {
-        camera.position[2] += 0.25 * fast_modifier;
+        move_by[2] += 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::A) {
-        camera.position[0] -= 0.25 * fast_modifier;
+        move_by[0] -= 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::D) {
-        camera.position[0] += 0.25 * fast_modifier;
+        move_by[0] += 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::R) {
-        camera.position[1] += 0.25 * fast_modifier;
+        move_by[1] += 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::F) {
-        camera.position[1] -= 0.25 * fast_modifier;
+        move_by[1] -= 0.25 * fast_modifier;
+    }
+
+    if move_by[0] != 0.0 || move_by[1] != 0.0 || move_by[2] != 0.0 {
+        camera.move_origin_by(move_by[0], move_by[1], move_by[2]);
     }
 }
 
@@ -118,42 +128,25 @@ fn tmp_exec_render(
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut app = App::new(window).await;
-    let mut camera = Camera {
-        position: [189.0, 40.0, 339.0, 0.0],
-        // position: [0.0, 265.0, 0.0, 0.0],
-    };
     let textures = RenderTexture::new(&app.device);
     let mut pressed_keys: HashSet<VirtualKeyCode> = HashSet::new();
 
-    // TEX TEST
-    // let diffuse_bytes = include_bytes!("teddy.jpg");
-    // let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
-    // let diffuse_rgba = diffuse_image.to_rgba8();
+    let mut camera = Camera::new();
 
-    ///////////////////////////////////////////////////////////
-    // let default_uniform = ComputeUniform {
-    //     test: [0.3, 0.2, 0.9, 1.0],
-    //     ..Default::default()
-    // };
-    // default_uniform.view_proj = (OPENGL_TO_WGPU_MATRIX * perspective_projection).invert().unwrap().into();
-    // println!("{:?}", default_uniform.view_proj);
-    // let tray_stor_buffer = ComputeContext::buffers_init(&app.device);
-    // let tray_uni_buffer = TracingPipeline::uniform_init(&app.device, default_uniform);
-    // let (tray_uni_layout, tray_uni_group) =
-    //     TracingPipeline::uniform_create_binds(&app.device, &tray_uni_buffer);
-    // pipeline_tracing.uniform_update(&app.queue);
-    ///////////////////////////////////////////////////////////
-
-    // let tracing_pipeline = Arc::new(Mutex::new(TracingPipeline::new(
-    //     &app.device,
-    //     &textures,
-    //     camera,
-    // )));
+    camera.set_perspective(90.0);
+    camera.move_origin_by(0.0, 0.0, 0.0);
+    camera.create_uniform_buffer(&app.device);
+    camera.update_uniform_buffer(&app.queue);
 
     let mut denoiser_pipeline = DenoiserPipeline::new(&app.device, &textures);
-    let mut tracing_pipeline_new = TracingPipelineTest::new(&app.device, &textures);
+    let mut tracing_pipeline_new = TracingPipelineTest::new(
+        &app.device,
+        &textures,
+        &camera.uniform_buffer.as_ref().unwrap(),
+    );
     let mut upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
     let mut fxaa_pipeline = FXAAPipeline::new(&app.device, &textures);
+    let mut temporal_reprojection = TemporalReprojection::new(&app.device, &textures);
 
     // let upscaler_pipeline = Upsca
     let mut chunks = Chunk::init();
@@ -293,6 +286,33 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut rng = rand::thread_rng();
     let mut tmp_sample_count: f32 = 1.0;
 
+    //
+
+    let timestamp_buffer = app.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Label::from("Timestamp Buffer"),
+        size: 8 * 3,
+        usage: BufferUsages::QUERY_RESOLVE
+            | BufferUsages::STORAGE
+            | BufferUsages::COPY_DST
+            | BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+
+    let timestamp_buffer_read = app.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Label::from("Timestamp Buffer Read"),
+        size: 8 * 3,
+        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+
+    let query_set = app.device.create_query_set(&wgpu::QuerySetDescriptor {
+        label: Label::from("Timestamp QuerySet"),
+        ty: wgpu::QueryType::Timestamp,
+        count: 3,
+    });
+
+    //
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
@@ -301,6 +321,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
             } => {
+                if input.virtual_keycode.is_none() {
+                    return;
+                }
+
                 let current_key = input.virtual_keycode.unwrap();
 
                 tmp_sample_count = 1.0;
@@ -358,6 +382,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     upscaler_pipeline.shader_realtime_compilation(&app.device, &app.window);
                     denoiser_pipeline.shader_realtime_compilation(&app.device, &app.window);
                     tracing_pipeline_new.shader_realtime_compilation(&app.device, &app.window);
+                    temporal_reprojection.shader_realtime_compilation(&app.device, &app.window);
 
                     app.window.set_title(
                         format!("{:3} FPS - {:3} ms", fps, 1000.0 / fps as f32).as_str(),
@@ -380,6 +405,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
                 handle_keypressed(&pressed_keys, &mut camera);
+                camera.update_uniform_buffer(&app.queue);
 
                 let rnd_number: u16 = rng.gen::<u16>();
 
@@ -387,7 +413,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 let setting_uniform = TracingPipelineSettings {
                     chunk_count: chunks.chunks_mem.len() as u32,
-                    player_position: camera.position,
+                    player_position: [
+                        camera.position[0],
+                        camera.position[1],
+                        camera.position[2],
+                        0.0,
+                    ],
                     frame_random_number: ((rnd_number as u32) << 16)
                         | (tmp_sample_count * 65535.0) as u32,
                 };
@@ -401,10 +432,34 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 // tracing_pipeline.compute_pass(&mut encoder);
+
+                encoder.write_timestamp(&query_set, 0);
+
                 tracing_pipeline_new.exec_pass(&mut encoder);
 
-                denoiser_pipeline.exec_pass(&mut encoder);
+                encoder.write_timestamp(&query_set, 1);
 
+                temporal_reprojection.exec_pass(&mut encoder);
+                app.queue.submit(Some(encoder.finish()));
+
+                // for _ in 0..3 {
+                //     let mut encoder = app
+                //         .device
+                //         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                //     // denoiser_pipeline.settings.step_width *= 1.1;
+                //     denoiser_pipeline.update_uniform_settings(&app.queue);
+                //     denoiser_pipeline.exec_pass(&mut encoder);
+                //     app.queue.submit(Some(encoder.finish()));
+                // }
+
+                let mut encoder = app
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                // denoiser_pipeline.settings.step_width *= 1.5;
+
+                // denoiser_pipeline.update_uniform_settings(&app.queue);
+
+                // denoiser_pipeline.exec_pass(&mut encoder);
                 // fxaa_pipeline.exec_pass(&mut encoder);
 
                 upscaler_pipeline.exec_passes(&mut encoder);
@@ -426,7 +481,39 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     &texture_group,
                 );
 
+                encoder.resolve_query_set(&query_set, 0..3, &timestamp_buffer, 0);
                 app.queue.submit(Some(encoder.finish()));
+
+                // {
+                //     let mut encoder = app
+                //         .device
+                //         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+                //     encoder.copy_buffer_to_buffer(
+                //         &timestamp_buffer,
+                //         0,
+                //         &timestamp_buffer_read,
+                //         0,
+                //         8 * 3,
+                //     );
+                //     app.queue.submit(Some(encoder.finish()));
+
+                //     timestamp_buffer_read
+                //         .slice(0..8)
+                //         .map_async(wgpu::MapMode::Read, |e| match e {
+                //             Ok(k) => {
+                //                 println!("Ok {:?}", k);
+                //                 // timestamp_buffer_read.unmap();
+                //             }
+                //             Err(e) => {
+                //                 println!("Hello {:?}", e);
+                //             }
+                //         });
+                //     app.device.poll(wgpu::Maintain::Poll);
+                //     // app.queue.submit(None);
+                //     // println!("{:?}",);
+                // }
+
                 frame.present();
             }
 
