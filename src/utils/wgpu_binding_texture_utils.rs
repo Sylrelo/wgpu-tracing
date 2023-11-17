@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 use wgpu::{
     BindingType, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, TextureFormat,

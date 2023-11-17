@@ -1,5 +1,5 @@
 use log::error;
-use std::{borrow::Cow, fs, collections::{HashSet, HashMap}, time::UNIX_EPOCH};
+use std::{borrow::Cow, collections::HashMap, fs, time::UNIX_EPOCH};
 
 use naga::valid::{Capabilities, ValidationFlags};
 use wgpu::{Device, Label, ShaderModule};
@@ -37,9 +37,8 @@ pub fn compile_shader(device: &Device, shader_path: &str) -> Option<ShaderModule
     };
 }
 
-
-pub fn live_shader_compilation(device: &Device, shader_path: String ) -> Option<ShaderModule> {
-    static mut LAST_TIME_GLOB: Option<HashMap<String, u64>> = None ;
+pub fn live_shader_compilation(device: &Device, shader_path: String) -> Option<ShaderModule> {
+    static mut LAST_TIME_GLOB: Option<HashMap<String, u64>> = None;
 
     let modification_time = fs::metadata(&shader_path);
     if modification_time.is_err() {
@@ -64,11 +63,12 @@ pub fn live_shader_compilation(device: &Device, shader_path: String ) -> Option<
 
         let old_modification_time = last_time_glob.insert(shader_path.clone(), modification_time);
 
-        if old_modification_time.is_none() || modification_time - old_modification_time.unwrap() == 0 {
+        if old_modification_time.is_none()
+            || modification_time - old_modification_time.unwrap() == 0
+        {
             return None;
         }
-
+        println!("File modified: {}", shader_path);
         return compile_shader(device, &shader_path);
     }
-
 }

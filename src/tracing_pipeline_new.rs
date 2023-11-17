@@ -5,11 +5,13 @@ use wgpu::{
     ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, Queue, ShaderModule,
     ShaderSource, ShaderStages, StorageTextureAccess, TextureFormat,
 };
+use winit::window::Window;
 
 use crate::{
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
+    wgpu_utils::live_shader_compilation,
 };
 
 #[repr(C)]
@@ -72,7 +74,7 @@ impl TracingPipelineTest {
     }
 
     pub fn recreate_pipeline(&mut self, device: &Device, shader_module: ShaderModule) {
-        self.pipeline = Self::init_pipeline(device, &self.bind_groups, &self.shader_module);
+        self.pipeline = Self::init_pipeline(device, &self.bind_groups, &shader_module);
         self.shader_module = shader_module;
     }
 
@@ -121,6 +123,19 @@ impl TracingPipelineTest {
             ))),
         })
     }
+
+    pub fn shader_realtime_compilation(&mut self, device: &Device, window: &Window) {
+        const SHADER_PATH: &str = "shaders/simple_raytracer_tests.wgsl";
+
+        let shader = live_shader_compilation(device, SHADER_PATH.to_string());
+
+        if shader.is_some() {
+            self.recreate_pipeline(device, shader.unwrap());
+            window.request_redraw();
+        }
+    }
+
+    // ===============================
 
     fn init_pipeline(
         device: &Device,

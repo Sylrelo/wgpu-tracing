@@ -652,8 +652,8 @@ fn main(
 
     let blending = f32((settings.frame_random_number) & 65535u) / 65535.0;
 
-    seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + 26699u) | (1u);
-    // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
+    // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + 26699u) | (1u);
+    seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
 
         // let foc_target = ray.orig + ray.dir * 20.0;
         // let defocus = 0.12 * rand2_in_circle(&seed);
@@ -678,7 +678,7 @@ fn main(
     var prev_color = textureLoad(color_output, screen_pos);
     prev_color = mix(prev_color.xyzz, tone_mapping.xyzz, blending);
 
-    textureStore(color_output, screen_pos, vec4(tone_mapping.xyz, 1.0));
+    textureStore(color_output, screen_pos, vec4(prev_color.xyz, 1.0));
     // textureStore(color_output2, screen_pos, vec4(tone_mapping.xyz, 1.0));
     // textureStore(color_output, screen_pos, vec4(raytrace(ray, ndc_pixel).xyz, 1.0));
 }
