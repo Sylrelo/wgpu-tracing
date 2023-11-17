@@ -5,11 +5,12 @@ use wgpu::{
     Label, PipelineLayoutDescriptor, ShaderModule, ShaderStages, StorageTextureAccess,
     TextureFormat,
 };
+use winit::window::Window;
 
 use crate::{
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
-    utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
+    utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder}, wgpu_utils::live_shader_compilation,
 };
 
 pub struct DenoiserBindGroups {
@@ -66,7 +67,7 @@ impl DenoiserPipeline {
     }
 
     pub fn recreate_pipeline(&mut self, device: &Device, shader_module: ShaderModule) {
-        self.pipeline = Self::init_pipeline(device, &self.bind_groups, &self.shader_module);
+        self.pipeline = Self::init_pipeline(device, &self.bind_groups, &shader_module);
         self.shader_module = shader_module;
     }
 
@@ -109,5 +110,17 @@ impl DenoiserPipeline {
             module: shader_module,
             entry_point: "main",
         })
+    }
+
+
+    pub fn shader_realtime_compilation(&mut self, device: &Device, window: &Window) {
+        const SHADER_PATH: &str = "shaders/denoiser.wgsl";
+
+        let shader = live_shader_compilation(device, SHADER_PATH.to_string());
+
+        if shader.is_some() {
+            self.recreate_pipeline(device, shader.unwrap());
+            window.request_redraw();
+        }
     }
 }

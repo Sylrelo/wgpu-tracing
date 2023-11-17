@@ -3,7 +3,7 @@ var texture: texture_storage_2d<rgba8unorm, read_write>;
 
 //////////////////////////////////////////////////////////
 
-const FXAA_SPAN_MAX = 4.0;
+const FXAA_SPAN_MAX = 8.0;
 const FXAA_REDUCE_MUL =(1.0 / FXAA_SPAN_MAX);
 const FXAA_REDUCE_MIN = (1.0 / 128.0);
 const FXAA_SUBPIX_SHIFT = (1.0 / 4.0);

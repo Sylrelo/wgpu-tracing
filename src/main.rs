@@ -7,7 +7,7 @@ use std::io::Read;
 use std::path::Path;
 
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::{thread, time};
 
 use denoiser_pipeline::DenoiserPipeline;
@@ -187,7 +187,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     //     &textures,
     //     camera,
     // )));
-    let denoiser_pipeline = Arc::new(Mutex::new(DenoiserPipeline::new(&app.device, &textures)));
+    let mut denoiser_pipeline =DenoiserPipeline::new(&app.device, &textures);
     let tracing_pipeline_new =
         Arc::new(Mutex::new(TracingPipelineTest::new(&app.device, &textures)));
 
@@ -311,10 +311,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         layout: pipeline_layout,
     };
 
-    let mut last_modified = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    // let mut last_modified = SystemTime::now()
+    //     .duration_since(UNIX_EPOCH)
+    //     .unwrap()
+    //     .as_secs();
 
     app.window.set_visible(true);
 
@@ -323,10 +323,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // let tracing_pipeline_arc = Arc::new(Mutex::new(tracing_pipeline));
 
     // let tracing_pipeline1 = tracing_pipeline.clone();
-    let denoiser_pipeline1 = denoiser_pipeline.clone();
-    let tracing_pipeline1 = tracing_pipeline_new.clone();
+    // let denoiser_pipeline1 = denoiser_pipeline.clone();
+    // let tracing_pipeline1 = tracing_pipeline_new.clone();
 
-    let app = app_arc.clone();
+    // let app = app_arc.clone();
     // let mut watcher = notify::recommended_watcher(move |res| match res {
     //     Ok(event) => {
     //         let ev = event as notify::event::Event;
@@ -382,7 +382,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let app = app_arc.clone();
     // let tracing_pipeline = tracing_pipeline.clone();
-    let denoiser_pipeline = denoiser_pipeline.clone();
+    // let denoiser_pipeline = denoiser_pipeline.clone();
 
     let mut fps = 0;
     let mut last_time = SystemTime::now()
@@ -403,7 +403,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         let mut app = app.lock().unwrap();
         // let tracing_pipeline = tracing_pipeline.lock().unwrap();
-        let denoiser_pipeline = denoiser_pipeline.lock().unwrap();
         let tracing_pipeline_new = tracing_pipeline_new.lock().unwrap();
         match event {
             Event::WindowEvent {
@@ -465,6 +464,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 if curr - last_time >= 1 {
                     upscaler_pipeline.shader_realtime_compilation(&app.device, &app.window);
+                    denoiser_pipeline.shader_realtime_compilation(&app.device, &app.window);
 
                     app.window.set_title(
                         format!("{:3} FPS - {:3} ms", fps, 1000.0 / fps as f32).as_str(),
@@ -473,6 +473,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     last_time = curr;
                 }
                 // println!("Done !");
+                thread::sleep(Duration::from_millis(80));
                 app.window.request_redraw();
             }
             Event::RedrawRequested(_) => {
@@ -511,7 +512,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 denoiser_pipeline.exec_pass(&mut encoder);
 
-                fxaa_pipeline.exec_pass(&mut encoder);
+                // fxaa_pipeline.exec_pass(&mut encoder);
 
                 upscaler_pipeline.exec_passes(&mut encoder);
 

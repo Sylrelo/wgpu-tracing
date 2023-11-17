@@ -32,8 +32,8 @@ fn main(
         vec2<i32>(vec2<f32>(screen_pos) * (vec2<f32>(input_size) / vec2<f32>(output_size)))
     );
 
-    textureStore(output_texture, screen_pos, vec4(old.xyz, 1.0));
-    // textureStore(output_texture, screen_pos, vec4(upscaled_colors.xyz, 1.0));
+    // textureStore(output_texture, screen_pos, vec4(old.xyz, 1.0));
+    textureStore(output_texture, screen_pos, vec4(upscaled_colors.xyz, 1.0));
 }
 
 
