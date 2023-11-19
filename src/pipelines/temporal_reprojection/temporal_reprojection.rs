@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use wgpu::{
-    CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
-    Label, PipelineLayoutDescriptor, ShaderModule, ShaderSource, ShaderStages,
+    Buffer, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
+    Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderSource, ShaderStages,
     StorageTextureAccess, TextureFormat,
 };
 use winit::window::Window;
@@ -14,20 +14,35 @@ use crate::{
     wgpu_utils::live_shader_compilation,
 };
 
+struct TemporalReprojectionBindings {
+    textures: BindGroups,
+    uniforms: BindGroups,
+}
+
 pub struct TemporalReprojection {
     pipeline: ComputePipeline,
     shader_module: ShaderModule,
-    bind_groups: BindGroups,
+    bind_groups: TemporalReprojectionBindings,
 }
 
 #[allow(dead_code)]
 impl TemporalReprojection {
-    pub fn new(device: &Device, textures: &RenderTexture) -> Self {
+    pub fn new(device: &Device, textures: &RenderTexture, camera_buffer: &Buffer) -> Self {
         println!("Init Temporal Reprojection Pipeline");
 
-        let bind_groups = Self::create_bind_groups(device, textures);
+        let uniform_bindingds = BindingGeneratorBuilder::new(device)
+            .with_default_buffer_uniform(ShaderStages::COMPUTE, camera_buffer)
+            .done()
+            .build();
+
+        let textures_bindings = Self::create_bind_groups(device, textures);
 
         let shader_module = Self::get_shader_modules(device);
+
+        let bind_groups = TemporalReprojectionBindings {
+            textures: textures_bindings,
+            uniforms: uniform_bindingds,
+        };
 
         let pipeline = Self::init_pipeline(device, &bind_groups, &shader_module);
 
@@ -50,7 +65,8 @@ impl TemporalReprojection {
         });
 
         compute_pass.set_pipeline(&self.pipeline);
-        compute_pass.set_bind_group(0, &self.bind_groups.bind_group, &[]);
+        compute_pass.set_bind_group(0, &self.bind_groups.uniforms.bind_group, &[]);
+        compute_pass.set_bind_group(1, &self.bind_groups.textures.bind_group, &[]);
         compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 16, 1);
     }
 
@@ -78,12 +94,15 @@ impl TemporalReprojection {
 
     fn init_pipeline(
         device: &Device,
-        bind_groups: &BindGroups,
+        bind_groups: &TemporalReprojectionBindings,
         shader_module: &ShaderModule,
     ) -> ComputePipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Label::from("Temporal Reprojection Layout"),
-            bind_group_layouts: &[&bind_groups.bind_group_layout],
+            bind_group_layouts: &[
+                &bind_groups.uniforms.bind_group_layout,
+                &bind_groups.textures.bind_group_layout,
+            ],
             push_constant_ranges: &[],
         });
 
@@ -101,7 +120,7 @@ impl TemporalReprojection {
             .done()
             .with_texture_only(ShaderStages::COMPUTE, &textures.velocity_view)
             .done()
-            .with_texture_only(ShaderStages::COMPUTE, &textures.normal_view)
+            .with_texture_only(ShaderStages::COMPUTE, &textures.depth_view)
             .done()
             .with_storage_texture(
                 &textures.accumulated_view,

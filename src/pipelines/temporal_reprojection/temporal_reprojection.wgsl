@@ -1,16 +1,33 @@
+struct CameraUniform {
+     position: vec4<f32>,
+
+     perspective: mat4x4<f32>,
+     perspective_inverse: mat4x4<f32>,
+
+     view: mat4x4<f32>,
+     view_inverse: mat4x4<f32>,
+
+     old_vp_matrix: mat4x4<f32>,
+};
+
+//
+
 @group(0) @binding(0)
+var<uniform> camera: CameraUniform;
+
+@group(1) @binding(0)
 var color_input: texture_2d<f32>;
 
-@group(0) @binding(1)
-var velocity_input: texture_2d<f32>;
+@group(1) @binding(1)
+var position_input: texture_2d<f32>;
 
-@group(0) @binding(2)
+@group(1) @binding(2)
 var normal_input: texture_2d<f32>;
 
-@group(0) @binding(3)
+@group(1) @binding(3)
 var accumulated_inout: texture_storage_2d<rgba8unorm, read_write>;
 
-@group(0) @binding(4)
+@group(1) @binding(4)
 var accumulated_history_output: texture_storage_2d<rgba8unorm, write>;
 
 
@@ -24,6 +41,7 @@ fn main(
     let screen_pos = vec2<i32>(i32(global_id.x), i32(global_id.y));
     let input_size = textureDimensions(color_input);
 
+    // let uwu = textureLoad(position_input, screen_pos, 0).xyz;
 
     let current_color = textureLoad(color_input, screen_pos, 0);
     let uv = vec2<f32>(screen_pos) / vec2<f32>(input_size);
@@ -44,7 +62,7 @@ fn main(
         );
     }
 
-    // let velo_offsets = textureLoad(velocity_input, screen_pos, 0);
+    // let velo_offsets = textureLoad(position_input, screen_pos, 0);
     // let current_color_2 = textureLoad(color_input, screen_pos + vec2<i32>(velo_offsets.xy * vec2<f32>(input_size)), 0);
 
     textureStore(accumulated_inout, screen_pos, (current_color));

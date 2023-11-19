@@ -7,6 +7,9 @@ struct CameraUniform {
      perspective_inverse: mat4x4<f32>,
 
      view: mat4x4<f32>,
+     view_inverse: mat4x4<f32>,
+
+     old_vp_matrix: mat4x4<f32>,
 };
 
 
@@ -529,14 +532,7 @@ fn pathtrace(ray_in: Ray, seed: ptr<function, u32>, screen_pos: vec2<i32>) -> ve
         if i == 0 || (is_prev_reflection && i == 1) {
             textureStore(normal_output, screen_pos, normal.xyzz);
 
-            let current_position = vec4(point, 1.0);
-            textureStore(depth_output, screen_pos, current_position);
-
-            textureStore(
-                velocity_texture,
-                screen_pos,
-                vec4(((current_position.xy) - (prev_position.xy)), 1.0, 1.0)
-            );
+            textureStore(depth_output, screen_pos, vec4(point, 1.0));
             // textureStore(depth_output, screen_pos, vec4(vec3(voxel_hit.t / 500.0), 1.0));
         }
 
@@ -622,6 +618,25 @@ fn raytrace(ray_in: Ray, screen_pos: vec2<f32>) -> vec3<f32> {
     return final_color / f32(MAX_SAMPLES);
 }
 
+fn get_raydir_from_matrix(screen_pos: vec2<i32>, screen_size: vec2<u32>) -> vec3<f32> {
+    var ndc_pixel = vec2(
+        (f32(screen_pos.x) + 0.5) / f32(screen_size.x),
+        (f32(screen_pos.y) + 0.5) / f32(screen_size.y),
+    );
+    ndc_pixel = ndc_pixel * 2.0 - 1.0;
+
+    let pt_nds = vec3(ndc_pixel.xy, -1.0);
+    let pt_ndsh = vec4(pt_nds.xyz, 1.0);
+
+    var dir_eyes = camera.perspective_inverse * pt_ndsh;
+    dir_eyes.w = 0.0;
+
+    var direction = (camera.view_inverse * dir_eyes).xyz;
+    direction.x *= -1.0;
+    direction.y *= -1.0;
+
+    return normalize(direction);
+}
 
 // ===========================================================
 @compute
@@ -633,16 +648,7 @@ fn main(
     let screen_pos: vec2<i32> = vec2<i32>(i32(global_id.x), i32(global_id.y));
     let aspect_ratio = f32(screen_size.x) / f32(screen_size.y);
 
-    let tatan = tan(1.5708 / 2.0);
-    let ndc_pixel = vec2(
-        (f32(screen_pos.x) + 0.5) / f32(screen_size.x),
-        (f32(screen_pos.y) + 0.5) / f32(screen_size.y),
-    );
-    let ndc_pos = vec2<f32>(
-        (2.0 * ndc_pixel.x - 1.0 * tatan) * aspect_ratio,
-        1.0 - 2.0 * ndc_pixel.y * tatan
-    );
-    var ray_direction = normalize(vec3(ndc_pos.xy, -1.0));
+    let ray_direction = get_raydir_from_matrix(screen_pos, screen_size);
 
     var ray: Ray = Ray(
         camera.position.xyz,
@@ -656,12 +662,12 @@ fn main(
 
     let MAX_SAMPLES = 1;
 
-    ray.dir = vec_rot_x(ray.dir, -0.45);
+    // ray.dir = vec_rot_x(ray.dir, -0.45);
     // ray.dir = vec_rot_y(ray.dir, -1.9);
     precalc_ray(&ray);
 
     textureStore(normal_output, screen_pos, vec4(0.0));
-    // textureStore(depth_output, screen_pos, vec4(0.0));
+    textureStore(depth_output, screen_pos, vec4(0.0));
     textureStore(velocity_texture, screen_pos, vec4(0.0));
     
     // var last_blend = prev_color.a;

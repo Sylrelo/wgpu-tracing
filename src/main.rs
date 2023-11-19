@@ -2,10 +2,10 @@ use std::borrow::Cow;
 
 use std::collections::HashSet;
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 
 use camera::Camera;
-use cgmath::SquareMatrix;
 use denoiser_pipeline::DenoiserPipeline;
 use pipelines::fxaa::fxaa_pipeline::FXAAPipeline;
 use pipelines::temporal_reprojection::temporal_reprojection::TemporalReprojection;
@@ -80,16 +80,26 @@ fn handle_keypressed(pressed_keys: &HashSet<VirtualKeyCode>, camera: &mut Camera
         move_by[2] += 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::A) {
-        move_by[0] -= 0.25 * fast_modifier;
+        move_by[0] += 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::D) {
-        move_by[0] += 0.25 * fast_modifier;
+        move_by[0] -= 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::R) {
         move_by[1] += 0.25 * fast_modifier;
     }
     if pressed_keys.contains(&VirtualKeyCode::F) {
         move_by[1] -= 0.25 * fast_modifier;
+    }
+
+    if pressed_keys.contains(&VirtualKeyCode::Up) {
+        camera.rotate_origin_by(1.50 * fast_modifier, 0.0, 0.0);
+    } else if pressed_keys.contains(&VirtualKeyCode::Down) {
+        camera.rotate_origin_by(-1.50 * fast_modifier, 0.0, 0.0);
+    } else if pressed_keys.contains(&VirtualKeyCode::Left) {
+        camera.rotate_origin_by(0.0, -1.50 * fast_modifier, 0.0);
+    } else if pressed_keys.contains(&VirtualKeyCode::Right) {
+        camera.rotate_origin_by(0.0, 1.50 * fast_modifier, 0.0);
     }
 
     if move_by[0] != 0.0 || move_by[1] != 0.0 || move_by[2] != 0.0 {
@@ -135,6 +145,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     camera.set_perspective(90.0);
     camera.move_origin_by(0.0, 0.0, 0.0);
+    camera.rotate_origin_by(-30.0, 0.0, 0.0);
     camera.create_uniform_buffer(&app.device);
     camera.update_uniform_buffer(&app.queue);
 
@@ -146,7 +157,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     );
     let mut upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
     let mut fxaa_pipeline = FXAAPipeline::new(&app.device, &textures);
-    let mut temporal_reprojection = TemporalReprojection::new(&app.device, &textures);
+    let mut temporal_reprojection = TemporalReprojection::new(
+        &app.device,
+        &textures,
+        &camera.uniform_buffer.as_ref().unwrap(),
+    );
 
     // let upscaler_pipeline = Upsca
     let mut chunks = Chunk::init();
@@ -346,7 +361,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 if input.state == ElementState::Released {
                     pressed_keys.remove(&current_key);
-                    println!("{:?}", camera.position);
+                    // println!("{:?}", camera.position);
                     return;
                 }
             }
@@ -391,7 +406,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     last_time = curr;
                 }
                 // println!("Done !");
-                // thread::sleep(Duration::from_millis(80));
+                thread::sleep(Duration::from_millis(80));
                 app.window.request_redraw();
             }
             Event::RedrawRequested(_) => {
@@ -413,12 +428,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 let setting_uniform = TracingPipelineSettings {
                     chunk_count: chunks.chunks_mem.len() as u32,
-                    player_position: [
-                        camera.position[0],
-                        camera.position[1],
-                        camera.position[2],
-                        0.0,
-                    ],
+                    player_position: [0.0, 0.0, 0.0, 0.0],
                     frame_random_number: ((rnd_number as u32) << 16)
                         | (tmp_sample_count * 65535.0) as u32,
                 };
