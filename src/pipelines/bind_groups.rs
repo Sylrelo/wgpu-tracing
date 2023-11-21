@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use wgpu::{Buffer, Device, ShaderStages, StorageTextureAccess, TextureFormat};
 
 use crate::{

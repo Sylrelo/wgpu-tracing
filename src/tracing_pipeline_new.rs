@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 
 use wgpu::{
-    Buffer, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, Device, Label, PipelineLayoutDescriptor, Queue, ShaderModule,
-    ShaderSource, ShaderStages, StorageTextureAccess, TextureFormat,
+    Buffer, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
+    Device, Label, PipelineLayoutDescriptor, ShaderModule, ShaderSource, ShaderStages,
+    StorageTextureAccess, TextureFormat,
 };
 use winit::window::Window;
 
 use crate::{
-    camera::Camera,
+    init_buffers::Buffers,
     init_textures::RenderTexture,
     structs::{INTERNAL_H, INTERNAL_W},
     utils::wgpu_binding_utils::{BindGroups, BindingGeneratorBuilder},
@@ -29,34 +29,30 @@ pub struct TracingPipelineBindGroups {
     pub buffers: BindGroups,
 }
 
-pub struct TracingPipelineBuffers {
-    pub chunk_content: Buffer,
-    pub chunk_content_size: u32,
-
-    pub uniform: Buffer,
-
-    pub root_grid: Buffer,
-}
-
 pub struct TracingPipelineTest {
     pub pipeline: ComputePipeline,
     pub shader_module: ShaderModule,
 
     pub bind_groups: TracingPipelineBindGroups,
-
-    pub buffers: TracingPipelineBuffers,
 }
 
 #[allow(dead_code)]
 impl TracingPipelineTest {
-    pub fn new(device: &Device, textures: &RenderTexture, camera_buffer: &Buffer) -> Self {
+    pub fn new(
+        device: &Device,
+        textures: &RenderTexture,
+        camera_buffer: &Buffer,
+        buffers: &Buffers,
+    ) -> Self {
         println!("Init TracingPipelineTest");
-
-        let buffers = Self::create_buffers(device);
 
         let bind_groups = TracingPipelineBindGroups {
             textures: Self::create_textures_bind_groups(device, textures),
-            uniforms: Self::uniform_create_bind_groups(device, &buffers.uniform, &camera_buffer),
+            uniforms: Self::uniform_create_bind_groups(
+                device,
+                buffers.rt_unidata.get_buffer(),
+                &camera_buffer,
+            ),
             buffers: Self::buffers_create_bind_groups(device, &buffers),
         };
 
@@ -71,7 +67,6 @@ impl TracingPipelineTest {
             pipeline,
 
             bind_groups,
-            buffers,
         }
     }
 
@@ -92,30 +87,6 @@ impl TracingPipelineTest {
         compute_pass.set_bind_group(2, &self.bind_groups.textures.bind_group, &[]);
         compute_pass.dispatch_workgroups(INTERNAL_W / 16, INTERNAL_H / 16, 1);
     }
-
-    // ===============================
-
-    pub fn buffer_chunk_content_update(&self, queue: &Queue, content: &Vec<u32>) {
-        queue.write_buffer(
-            &self.buffers.chunk_content,
-            0,
-            bytemuck::cast_slice(content.as_slice()),
-        );
-    }
-
-    pub fn buffer_root_grid_update(&self, queue: &Queue, grid: &Vec<[i32; 4]>) {
-        queue.write_buffer(
-            &self.buffers.root_grid,
-            0,
-            bytemuck::cast_slice(grid.as_slice()),
-        );
-    }
-
-    pub fn uniform_settings_update(&self, queue: &Queue, settings: TracingPipelineSettings) {
-        queue.write_buffer(&self.buffers.uniform, 0, bytemuck::cast_slice(&[settings]));
-    }
-
-    // ===============================
 
     fn get_shader_module(device: &Device) -> ShaderModule {
         device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -218,43 +189,20 @@ impl TracingPipelineTest {
             .build()
     }
 
-    fn buffers_create_bind_groups(device: &Device, buffers: &TracingPipelineBuffers) -> BindGroups {
+    fn buffers_create_bind_groups(device: &Device, buffers: &Buffers) -> BindGroups {
         BindingGeneratorBuilder::new(device)
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.chunk_content, true)
+            .with_default_buffer_storage(
+                ShaderStages::COMPUTE,
+                &buffers.rt_chunk_content.get_buffer(),
+                true,
+            )
             .done()
-            .with_default_buffer_storage(ShaderStages::COMPUTE, &buffers.root_grid, true)
+            .with_default_buffer_storage(
+                ShaderStages::COMPUTE,
+                &buffers.rt_chunk_grid.get_buffer(),
+                true,
+            )
             .done()
             .build()
-    }
-
-    fn create_buffers(device: &Device) -> TracingPipelineBuffers {
-        let uniform = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : Uniform Buffer"),
-            mapped_at_creation: false,
-            size: 32,
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        });
-
-        let chunk_content = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : Chunk Content Buffer"),
-            mapped_at_creation: false,
-            size: 1147483640,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
-
-        let root_grid = device.create_buffer(&BufferDescriptor {
-            label: Label::from("Tracing Pipeline : ROOT GRID"),
-            mapped_at_creation: false,
-            size: 30 * 30 * 16,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        });
-
-        TracingPipelineBuffers {
-            chunk_content,
-            chunk_content_size: 900 * 4,
-            uniform,
-
-            root_grid,
-        }
     }
 }

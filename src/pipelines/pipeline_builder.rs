@@ -1,4 +1,5 @@
-use std::borrow::Cow;
+#![allow(dead_code)]
+use std::{borrow::Cow, sync::Arc};
 
 use wgpu::{
     BindGroupLayout, CommandEncoder, ComputePassDescriptor, ComputePipeline,
@@ -8,13 +9,13 @@ use wgpu::{
 
 use crate::{structs::ShaderAssets, utils::wgpu_binding_utils::BindGroups};
 
-pub struct PipelineBuilder<'a> {
-    device: &'a Device,
-    queue: &'a Queue,
+pub struct PipelineBuilder {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
 }
 
-impl<'a> PipelineBuilder<'a> {
-    pub fn new(device: &'a Device, queue: &'a Queue) -> Self {
+impl PipelineBuilder {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
         Self {
             device: device,
             queue: queue,
@@ -22,7 +23,7 @@ impl<'a> PipelineBuilder<'a> {
     }
 
     pub fn create_pipeline(&self, pipeline_type: PipelineType, shader_path: &str) -> Pipeline {
-        let mut pipeline = Pipeline::new(self.device, self.queue);
+        let mut pipeline = Pipeline::new(self.device.clone(), self.queue.clone());
 
         pipeline.set_type(pipeline_type);
         pipeline.set_shader(shader_path);
@@ -43,15 +44,15 @@ pub enum PipelineType {
     Render,
 }
 
-pub struct Pipeline<'a> {
-    device: &'a Device,
-    queue: &'a Queue,
+pub struct Pipeline {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
     bind_groups: Vec<BindGroups>,
     workgroup_dispatch_size: [u32; 2],
 
     shader_module: Option<ShaderModule>,
 
-    label: &'a str,
+    label: String,
 
     shader_path: String,
 
@@ -61,8 +62,8 @@ pub struct Pipeline<'a> {
     pipeline: PipelineTypeReturn,
 }
 
-impl<'a> Pipeline<'a> {
-    pub fn new(device: &'a Device, queue: &'a Queue) -> Self {
+impl Pipeline {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
         Self {
             device: device,
             queue: queue,
@@ -71,7 +72,7 @@ impl<'a> Pipeline<'a> {
 
             pipeline_type: PipelineType::Compute,
             // pipeline_layout: None,
-            label: "Patate",
+            label: String::new(),
 
             shader_module: None,
             shader_path: String::new(),
@@ -95,7 +96,7 @@ impl<'a> Pipeline<'a> {
         let shader_content = std::str::from_utf8(&shader_cotent).unwrap();
 
         let shader_module = self.device.create_shader_module(ShaderModuleDescriptor {
-            label: Label::from(self.label),
+            label: Label::from(self.label.as_str()),
             source: ShaderSource::Wgsl(Cow::Borrowed(&shader_content)),
         });
 
@@ -129,7 +130,7 @@ impl<'a> Pipeline<'a> {
         command_encoder: &mut CommandEncoder,
     ) {
         let mut compute_pass = command_encoder.begin_compute_pass(&ComputePassDescriptor {
-            label: Label::from(self.label),
+            label: Label::from(self.label.as_str()),
             timestamp_writes: None,
         });
 
@@ -157,7 +158,7 @@ impl<'a> Pipeline<'a> {
 
         self.device
             .create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Label::from(self.label),
+                label: Label::from(self.label.as_str()),
                 bind_group_layouts: &bind_group_layouts.as_slice(),
                 push_constant_ranges: &[],
             })
@@ -173,7 +174,7 @@ impl<'a> Pipeline<'a> {
                 let compute_pipeline =
                     self.device
                         .create_compute_pipeline(&ComputePipelineDescriptor {
-                            label: Label::from(self.label),
+                            label: Label::from(self.label.as_str()),
                             layout: Some(&pipeline_layout),
                             module: &self.shader_module.as_ref().unwrap(),
                             entry_point: "main",

@@ -33,7 +33,7 @@ pub struct Camera {
     pub old_vp_matrix: Matrix4<f32>,
 
     pub as_uniform: CameraUniform,
-    pub uniform_buffer: Option<wgpu::Buffer>,
+    // pub uniform_buffer: Option<SynBuffer>,
 }
 
 impl Camera {
@@ -42,6 +42,7 @@ impl Camera {
             "[Debug] SizeOf CameraUniform {}",
             std::mem::size_of::<CameraUniform>()
         );
+
         Camera {
             position: [189.0, 40.0, 339.0],
             old_position: [189.0, 40.0, 339.0],
@@ -60,7 +61,7 @@ impl Camera {
             old_vp_matrix: Matrix4::identity(),
 
             as_uniform: CameraUniform::default(),
-            uniform_buffer: None,
+            // uniform_buffer: None,
         }
     }
 
@@ -133,30 +134,5 @@ impl Camera {
 
         self.old_vp_matrix = view * self.perspective;
         self.as_uniform.old_vp_matrix = self.old_vp_matrix.into();
-    }
-
-    // ===========================
-
-    pub fn create_uniform_buffer(&mut self, device: &wgpu::Device) {
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: wgpu::Label::from("Camera Buffer"),
-            size: std::mem::size_of::<CameraUniform>() as u64,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
-            mapped_at_creation: false,
-        });
-
-        self.uniform_buffer = Some(buffer);
-    }
-
-    pub fn update_uniform_buffer(&self, queue: &wgpu::Queue) {
-        match &self.uniform_buffer {
-            Some(buffer) => {
-                queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[self.as_uniform]));
-            }
-            None => {
-                println!("Cannot update Camera Uniform Buffer");
-                return;
-            }
-        }
     }
 }

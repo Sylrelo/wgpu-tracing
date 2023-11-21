@@ -2,20 +2,18 @@ use std::borrow::Cow;
 
 use std::collections::HashSet;
 
-use std::os::unix::process;
-use std::process::exit;
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use camera::Camera;
 use denoiser_pipeline::DenoiserPipeline;
+use init_buffers::Buffers;
 use pipelines::fxaa::fxaa_pipeline::FXAAPipeline;
 use pipelines::temporal_reprojection::temporal_reprojection::TemporalReprojection;
 use pipelines::upscaler::pipeline::UpscalerPipeline;
-use pipelines::PipelineBuilder;
 use rand::Rng;
 use tracing_pipeline_new::TracingPipelineTest;
-use wgpu::{BufferUsages, Label, ShaderStages};
+use wgpu::{BufferUsages, Device, Label, Queue, ShaderStages};
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{ElementState, VirtualKeyCode};
 use winit::window::WindowBuilder;
@@ -30,13 +28,14 @@ use structs::{App, SwapchainData};
 use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{RenderContext, ShaderAssets, INTERNAL_H, INTERNAL_W};
+use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline_new::TracingPipelineSettings;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
 mod camera;
 mod chunk_generator;
 mod denoiser_pipeline;
+mod init_buffers;
 mod init_render_pipeline;
 mod init_textures;
 mod init_wgpu;
@@ -45,6 +44,11 @@ mod structs;
 mod tracing_pipeline_new;
 mod utils;
 mod wgpu_utils;
+
+pub struct Context {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+}
 
 impl App {
     pub async fn new(window: Window) -> App {
@@ -142,17 +146,25 @@ fn tmp_exec_render(
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut app = App::new(window).await;
 
-    let pipeline_builder = PipelineBuilder::PipelineBuilder::new(&app.device, &app.queue);
+    let context = Context {
+        device: Arc::new(app.device),
+        queue: Arc::new(app.queue),
+    };
 
-    let test = pipeline_builder
-        .create_pipeline(
-            PipelineBuilder::PipelineType::Compute,
-            "simple_raytracer_tests.wgsl",
-        )
-        .set_workgroup_dispatch_size(INTERNAL_W / 16, INTERNAL_H / 16);
+    // let pipeline_builder = pipeline_builder::PipelineBuilder::new(context.device, context.queue);
 
-    exit(1);
-    let textures = RenderTexture::new(&app.device);
+    // let test = pipeline_builder
+    //     .create_pipeline(
+    //         pipeline_builder::PipelineType::Compute,
+    //         "simple_raytracer_tests.wgsl",
+    //     )
+    //     .set_workgroup_dispatch_size(INTERNAL_W / 16, INTERNAL_H / 16);
+
+    // exit(1);
+
+    let buffers = Buffers::new(&context);
+
+    let textures = RenderTexture::new(&context.device);
     let mut pressed_keys: HashSet<VirtualKeyCode> = HashSet::new();
 
     let mut camera = Camera::new();
@@ -160,79 +172,81 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     camera.set_perspective(90.0);
     camera.move_origin_by(0.0, 0.0, 0.0);
     camera.rotate_origin_by(-30.0, 0.0, 0.0);
-    camera.create_uniform_buffer(&app.device);
-    camera.update_uniform_buffer(&app.queue);
+    // camera.create_uniform_buffer(&context);
+    // camera.update_uniform_buffer();
 
-    let mut denoiser_pipeline = DenoiserPipeline::new(&app.device, &textures);
+    let mut denoiser_pipeline = DenoiserPipeline::new(&context.device, &textures);
+
     let mut tracing_pipeline_new = TracingPipelineTest::new(
-        &app.device,
+        &context.device,
         &textures,
-        &camera.uniform_buffer.as_ref().unwrap(),
+        buffers.uni_camera.get_buffer(),
+        &buffers,
     );
-    let mut upscaler_pipeline = UpscalerPipeline::new(&app.device, &textures);
-    let mut fxaa_pipeline = FXAAPipeline::new(&app.device, &textures);
-    let mut temporal_reprojection = TemporalReprojection::new(
-        &app.device,
-        &textures,
-        &camera.uniform_buffer.as_ref().unwrap(),
-    );
+    let mut upscaler_pipeline = UpscalerPipeline::new(&context.device, &textures);
+
+    let mut fxaa_pipeline = FXAAPipeline::new(&context.device, &textures);
+
+    let mut temporal_reprojection =
+        TemporalReprojection::new(&context.device, &textures, buffers.uni_camera.get_buffer());
 
     // let upscaler_pipeline = Upsca
     let mut chunks = Chunk::init();
     //////////
 
-    let shader = app
+    let shader = context
         .device
         .create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("../shaders/shader.wgsl"))),
         });
 
-    let render_texture_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_bindgroups = BindingGeneratorBuilder::new(&context.device)
         // .with_texture_and_sampler(&textures.render_view, &textures.render_sanpler)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.render_view)
         .done()
         .build();
 
-    let render_texture_normal_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_normal_debug_bindgroups = BindingGeneratorBuilder::new(&context.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.normal_view)
         .done()
         .build();
 
-    let render_texture_color_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_color_debug_bindgroups = BindingGeneratorBuilder::new(&context.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.color_view)
         .done()
         .build();
 
-    let render_texture_depth_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_depth_debug_bindgroups = BindingGeneratorBuilder::new(&context.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.depth_view)
         .done()
         .build();
 
-    let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_velocity_debug_bindgroups = BindingGeneratorBuilder::new(&context.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.velocity_view)
         .done()
         .build();
 
-    let render_texture_final_view_bindgroups = BindingGeneratorBuilder::new(&app.device)
+    let render_texture_final_view_bindgroups = BindingGeneratorBuilder::new(&context.device)
         .with_texture_only(ShaderStages::FRAGMENT, &textures.final_render_view)
         .done()
         .build();
 
-    let render_uniform = app.device.create_buffer(&wgpu::BufferDescriptor {
+    let render_uniform = context.device.create_buffer(&wgpu::BufferDescriptor {
         label: Label::from("RENDER Pipeline : RENDER UNIFORM"),
         mapped_at_creation: false,
         size: 16,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     });
-    let render_uniform_binds = BindingGeneratorBuilder::new(&app.device)
+    let render_uniform_binds = BindingGeneratorBuilder::new(&context.device)
         .with_default_buffer_uniform(wgpu::ShaderStages::VERTEX, &render_uniform)
         .done()
         .build();
 
     //tmp
     let render_texture_bind_group_layout =
-        app.device
+        context
+            .device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
@@ -255,7 +269,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 label: Some("texture_bind_group_layout"),
             });
 
-    let pipeline_layout = app
+    let pipeline_layout = context
         .device
         .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
@@ -266,7 +280,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             push_constant_ranges: &[],
         });
 
-    let ren_pipeline = app
+    let ren_pipeline = context
         .device
         .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
@@ -287,7 +301,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             multiview: None,
         });
 
-    app.surface.configure(&app.device, &app.config);
+    app.surface.configure(&context.device, &app.config);
 
     let render_pipeline = RenderContext {
         pipeline: ren_pipeline,
@@ -317,7 +331,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     //
 
-    let timestamp_buffer = app.device.create_buffer(&wgpu::BufferDescriptor {
+    let timestamp_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
         label: Label::from("Timestamp Buffer"),
         size: 8 * 3,
         usage: BufferUsages::QUERY_RESOLVE
@@ -327,14 +341,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         mapped_at_creation: false,
     });
 
-    let timestamp_buffer_read = app.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Label::from("Timestamp Buffer Read"),
-        size: 8 * 3,
-        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
+    // let timestamp_buffer_read = context.device.create_buffer(&wgpu::BufferDescriptor {
+    //     label: Label::from("Timestamp Buffer Read"),
+    //     size: 8 * 3,
+    //     usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+    //     mapped_at_creation: false,
+    // });
 
-    let query_set = app.device.create_query_set(&wgpu::QuerySetDescriptor {
+    let query_set = context.device.create_query_set(&wgpu::QuerySetDescriptor {
         label: Label::from("Timestamp QuerySet"),
         ty: wgpu::QueryType::Timestamp,
         count: 3,
@@ -387,12 +401,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 let new_size = app.window.inner_size();
                 app.config.width = new_size.width;
                 app.config.height = new_size.height;
-                app.surface.configure(&app.device, &app.config);
+                app.surface.configure(&context.device, &app.config);
 
                 if already_uploaded_tmp == false {
-                    tracing_pipeline_new.buffer_root_grid_update(&app.queue, &chunks.root_grid);
-                    tracing_pipeline_new
-                        .buffer_chunk_content_update(&app.queue, &chunks.chunks_mem);
+                    buffers.rt_chunk_grid.update_buffer_vec(&chunks.root_grid);
+                    buffers
+                        .rt_chunk_content
+                        .update_buffer_vec(&chunks.chunks_mem);
 
                     already_uploaded_tmp = true
                 }
@@ -408,10 +423,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fps += 1;
 
                 if curr - last_time >= 1 {
-                    upscaler_pipeline.shader_realtime_compilation(&app.device, &app.window);
-                    denoiser_pipeline.shader_realtime_compilation(&app.device, &app.window);
-                    tracing_pipeline_new.shader_realtime_compilation(&app.device, &app.window);
-                    temporal_reprojection.shader_realtime_compilation(&app.device, &app.window);
+                    upscaler_pipeline.shader_realtime_compilation(&context.device, &app.window);
+                    denoiser_pipeline.shader_realtime_compilation(&context.device, &app.window);
+                    tracing_pipeline_new.shader_realtime_compilation(&context.device, &app.window);
+                    temporal_reprojection.shader_realtime_compilation(&context.device, &app.window);
 
                     app.window.set_title(
                         format!("{:3} FPS - {:3} ms", fps, 1000.0 / fps as f32).as_str(),
@@ -434,7 +449,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
                 handle_keypressed(&pressed_keys, &mut camera);
-                camera.update_uniform_buffer(&app.queue);
+
+                buffers.uni_camera.update_buffer_struct(camera.as_uniform);
 
                 let rnd_number: u16 = rng.gen::<u16>();
 
@@ -447,24 +463,24 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         | (tmp_sample_count * 65535.0) as u32,
                 };
 
-                tracing_pipeline_new.uniform_settings_update(&app.queue, setting_uniform);
+                // tracing_pipeline_new.uniform_settings_update(&context.queue, setting_uniform);
+
+                buffers.rt_unidata.update_buffer_struct(setting_uniform);
 
                 // println!("{}", ((setting_uniform.frame_random_number) & 65535) as f32 / 65535.0);
 
-                let mut encoder = app
+                let mut encoder = context
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-                // tracing_pipeline.compute_pass(&mut encoder);
-
-                encoder.write_timestamp(&query_set, 0);
+                // encoder.write_timestamp(&query_set, 0);
 
                 tracing_pipeline_new.exec_pass(&mut encoder);
-
-                encoder.write_timestamp(&query_set, 1);
-
+                // encoder.write_timestamp(&query_set, 1);
                 temporal_reprojection.exec_pass(&mut encoder);
-                app.queue.submit(Some(encoder.finish()));
+                upscaler_pipeline.exec_passes(&mut encoder);
+
+                // app.queue.submit(Some(encoder.finish()));
 
                 // for _ in 0..3 {
                 //     let mut encoder = app
@@ -476,17 +492,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 //     app.queue.submit(Some(encoder.finish()));
                 // }
 
-                let mut encoder = app
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                // let mut encoder = app
+                //     .device
+                //     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 // denoiser_pipeline.settings.step_width *= 1.5;
 
                 // denoiser_pipeline.update_uniform_settings(&app.queue);
 
                 // denoiser_pipeline.exec_pass(&mut encoder);
                 // fxaa_pipeline.exec_pass(&mut encoder);
-
-                upscaler_pipeline.exec_passes(&mut encoder);
 
                 let texture_group = match tmp_displayed_texture {
                     1 => &render_texture_bindgroups.bind_group,
@@ -506,7 +520,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 );
 
                 encoder.resolve_query_set(&query_set, 0..3, &timestamp_buffer, 0);
-                app.queue.submit(Some(encoder.finish()));
+                context.queue.submit(Some(encoder.finish()));
 
                 // {
                 //     let mut encoder = app
