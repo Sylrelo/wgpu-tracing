@@ -1,4 +1,5 @@
 use cgmath::Matrix4;
+use rust_embed::RustEmbed;
 use wgpu::{PipelineLayout, RenderPipeline, SurfaceCapabilities, TextureFormat};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -35,3 +36,7 @@ pub struct App {
 pub struct RenderUniform {
     pub position_offset: [f32; 4],
 }
+
+#[derive(RustEmbed)]
+#[folder = "shaders/"]
+pub struct ShaderAssets;

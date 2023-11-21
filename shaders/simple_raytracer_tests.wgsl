@@ -678,7 +678,7 @@ fn main(
     let blending = f32((settings.frame_random_number) & 65535u) / 65535.0;
 
     seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + 26699u) | (1u);
-    // seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
+    seed = (u32(screen_pos.x) * 1973u + u32(screen_pos.y) * 9277u + settings.frame_random_number * 26699u) | (1u);
 
         // let foc_target = ray.orig + ray.dir * 20.0;
         // let defocus = 0.12 * rand2_in_circle(&seed);
@@ -691,7 +691,6 @@ fn main(
 
     // ray.orig.x += ((rnd * 0.5) - rnd) * 0.01;
     // ray.orig.y += ((rnd * 0.5) - rnd) * 0.01;
-
     final_color = pathtrace(ray, &seed, screen_pos);
     // }
 

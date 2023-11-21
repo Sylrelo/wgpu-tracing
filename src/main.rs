@@ -2,14 +2,17 @@ use std::borrow::Cow;
 
 use std::collections::HashSet;
 
+use std::os::unix::process;
+use std::process::exit;
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use camera::Camera;
 use denoiser_pipeline::DenoiserPipeline;
 use pipelines::fxaa::fxaa_pipeline::FXAAPipeline;
 use pipelines::temporal_reprojection::temporal_reprojection::TemporalReprojection;
 use pipelines::upscaler::pipeline::UpscalerPipeline;
+use pipelines::PipelineBuilder;
 use rand::Rng;
 use tracing_pipeline_new::TracingPipelineTest;
 use wgpu::{BufferUsages, Label, ShaderStages};
@@ -27,7 +30,7 @@ use structs::{App, SwapchainData};
 use crate::chunk_generator::Chunk;
 use crate::init_textures::RenderTexture;
 use crate::init_wgpu::InitWgpu;
-use crate::structs::{RenderContext, INTERNAL_H, INTERNAL_W};
+use crate::structs::{RenderContext, ShaderAssets, INTERNAL_H, INTERNAL_W};
 use crate::tracing_pipeline_new::TracingPipelineSettings;
 use crate::utils::wgpu_binding_utils::BindingGeneratorBuilder;
 
@@ -138,6 +141,17 @@ fn tmp_exec_render(
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut app = App::new(window).await;
+
+    let pipeline_builder = PipelineBuilder::PipelineBuilder::new(&app.device, &app.queue);
+
+    let test = pipeline_builder
+        .create_pipeline(
+            PipelineBuilder::PipelineType::Compute,
+            "simple_raytracer_tests.wgsl",
+        )
+        .set_workgroup_dispatch_size(INTERNAL_W / 16, INTERNAL_H / 16);
+
+    exit(1);
     let textures = RenderTexture::new(&app.device);
     let mut pressed_keys: HashSet<VirtualKeyCode> = HashSet::new();
 
@@ -406,7 +420,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     last_time = curr;
                 }
                 // println!("Done !");
-                thread::sleep(Duration::from_millis(80));
+                // thread::sleep(Duration::from_millis(80));
                 app.window.request_redraw();
             }
             Event::RedrawRequested(_) => {

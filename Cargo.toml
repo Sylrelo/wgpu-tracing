@@ -24,6 +24,7 @@ log = "0.4.20"
 
 rand = "0.8.5"
 
+rust-embed = "8.0.0"
 
 # tests
 bvh = "0.7.2"
